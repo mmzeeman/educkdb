@@ -1,0 +1,13 @@
+.rebar
+.rebar3
+rebar3
+ebin
+priv
+.eunit/*
+*.swp
+*.o
+*~
+_build
+c_src/**/*.d
+erl_crash.dump
+tags

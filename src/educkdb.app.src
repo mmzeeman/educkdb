@@ -1,0 +1,15 @@
+{application, educkdb,
+ [
+  {description, "duckdb nif interface"},
+  {vsn, "0.0.1"},
+  {modules, [educkdb, educkdb_nif]},
+  {registered, []},
+  {licenses, ["Apache"]},
+  {links, [{"Github", "https://github.com/mmzeeman/educkdb"}]},
+  {include_files, ["Makefile"]},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.

@@ -1,0 +1,85 @@
+
+NifSharedSources = ["c_src/educkdb_nif.c", "c_src/queue.c"].
+NifStaticSources = NifSharedSources ++ ["c_src/duckdb/duckdb.cpp"].
+CFlagsDefault = "$CFLAGS -Os".
+CXXFlagsDefault = "$CXXFLAGS -Os -std=c++11".
+DrvLdFlagsDefault = "-shared -lduckdb".
+
+DrvLdFlags =
+    case os:getenv("ESQLITE_CFLAGS") of
+        NotDefined when NotDefined == false; NotDefined == [] ->
+            DrvLdFlagsDefault;
+        DrvLdFlagsOverride ->
+            DrvLdFlagsOverride
+    end.
+
+{NifSources, LdEnv, CFlagsExt, CXXFlagsExt} =
+    {NifStaticSources, [], "-Ic_src/duckdb", ""}.
+
+CFlags =
+    case os:getenv("EDUCKDB_CFLAGS") of
+        NotDefined when NotDefined == false; NotDefined == [] ->
+            CFlagsDefault ++ CFlagsExt;
+        CFlagsOverride ->
+            CFlagsOverride
+    end.
+
+CXXFlags =
+    case os:getenv("EDUCKDB_CXXFLAGS") of
+        NotDefined when NotDefined == false; NotDefined == [] ->
+            CXXFlagsDefault ++ CXXFlagsExt;
+        CFlagsOverride ->
+            CFlagsOverride
+    end.
+
+
+[
+    {minimum_otp_vsn, "21.0"},
+
+    {erl_opts, [debug_info, warnings_as_errors]},
+
+    {xref_checks, [undefined_function_calls,
+                   undefined_functions,
+                   locals_not_used,
+                   deprecated_function_calls,
+                   deprecated_functions]},
+
+    {port_env, [
+        %% Default darwin ldflags causes loading of system sqlite. Removed -bundle flag.
+        {"darwin", "DRV_LDFLAGS", "-flat_namespace -undefined suppress $ERL_LDFLAGS"},
+
+        {"solaris", "CFLAGS", "$CFLAGS -std=c99"},
+
+        {"linux", "CFLAGS", "$CFLAGS -std=c11"},
+
+        {"CFLAGS", CFlags},
+        {"CXXFLAGS", CXXFlags}
+
+    ] ++ LdEnv},
+    {port_specs, [
+        {"priv/educkdb_nif.so", NifSources}
+    ]},
+
+    {plugins, [pc]},
+
+    {provider_hooks,
+        [{post,
+        [{compile, {pc, compile}},
+            {clean, {pc, clean}}]}]},
+
+    {dialyzer, [
+        {warnings, [
+            unmatched_returns,
+            error_handling,
+            race_conditions,
+            underspecs,
+            unknown
+        ]}
+    ]},
+
+    {edoc_opts, [{preprocess, true},
+                 {sort_functions, false}]},
+
+    {hex, [{doc, edoc}]}
+
+].
