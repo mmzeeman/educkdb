@@ -20,33 +20,13 @@
 
 %% low-level exports
 -export([
-    start/0,
-    open/4,
-    set_update_hook/4,
-    exec/4,
-    changes/3,
-    insert/4,
-    last_insert_rowid/3,
-    get_autocommit/3,
-    prepare/4,
-    multi_step/5,
-    reset/4,
-    finalize/4,
-    bind/5,
-    column_names/4,
-    column_types/4,
-    backup_init/6,
-    backup_step/5,
-    backup_remaining/4,
-    backup_pagecount/4,
-    backup_finish/4,
-    interrupt/1,
-    close/3
+    open/2
+
 ]).
 
+-type raw_database() :: reference().
 -type raw_connection() :: reference().
 -type raw_statement() :: reference().
--type raw_backup() :: reference().
 -type sql() :: iodata(). 
 
 -export_type([raw_connection/0, raw_statement/0, raw_backup/0, sql/0]).
@@ -54,145 +34,49 @@
 -on_load(init/0).
 
 init() ->
-    NifName = "esqlite3_nif",
+    NifName = "educkdb_nif",
     NifFileName = case code:priv_dir(esqlite) of
                       {error, bad_name} -> filename:join("priv", NifName);
                       Dir -> filename:join(Dir, NifName)
                   end,
     ok = erlang:load_nif(NifFileName, 0).
 
-%% @doc Start a low level thread which will can handle sqlite3 calls.
+%% @doc Open, or create a duckdb file
 %%
--spec start() -> {ok, raw_connection()} | {error, _}.
-start() ->
+-spec start() -> {ok, raw_database()} | {error, _}.
+open(Filename, Options) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc Open the specified sqlite3 database.
+%% @doc Connect to the database. In the background a thread is started which 
+%%      is used by long running commands. Note: It is adviced to use the
+%%      connection in a single process.
 %%
-%% Sends an asynchronous open command over the connection and returns
-%% ok immediately. When the database is opened
-%%
--spec open(raw_connection(), reference(), pid(), string()) -> ok | {error, _}.
-open(_Db, _Ref, _Dest, _Filename) ->
+-spec connect(raw_database()) -> {ok, raw_connection()} | {error, _}.
+connect(Db) ->
+    case connect_nif(Db) of
+        {ok, Ref} ->
+            receive
+                {connect, Ref, Answer} -> Answer
+            end
+        {error, _}=E ->
+            E
+    end.
+
+%% After calling the calling pid will receive
+%% the message {connect, Ref, {ok, raw_connection()} | {error, _} }
+connect_nif(Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec set_update_hook(raw_connection(), reference(), pid(), pid()) -> ok | {error, _}.
-set_update_hook(_Db, _Ref, _Dest, _Pid) ->
+%% @doc Disconnect from the database. Stops the thread.
+%%      The calling pid will receive:
+%%      {disconnect, Ref, ok | {error, _}}.
+-spec connect(raw_connection()) -> {ok, Ref} | {error, _}.
+disconnect(Connection) ->
     erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Exec the query.
-%%
-%% Sends an asynchronous exec command over the connection and returns
-%% ok immediately.
-%%
-%% When the statement is executed Dest will receive message {Ref, answer()}
-%% with answer() integer | {error, reason()}
-%%
--spec exec(raw_connection(), reference(), pid(), sql()) -> ok | {error, _}.
-exec(_Db, _Ref, _Dest, _Sql) ->
+                                 
+%% @doc Close the database. All open connections will become unusable.
+-spec close(raw_database()) -> ok | {error, _}.
+close(Db) ->
     erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get the number of affected rows of last statement
-%%
-%% When the statement is executed Dest will receive message {Ref, answer()}
-%% with answer() integer | {error, reason()}
--spec changes(raw_connection(), reference(), pid()) -> ok | {error, _}.
-changes(_Db, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc
-%%
--spec prepare(raw_connection(), reference(), pid(), sql()) -> ok | {error, _}.
-prepare(_Db, _Ref, _Dest, _Sql) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc
-%%
--spec multi_step(raw_connection(), raw_statement(), pos_integer(), reference(), pid()) -> ok | {error, _}.
-multi_step(_Db, _Stmt, _Chunk_Size, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc
-%%
--spec reset(raw_connection(), raw_statement(), reference(), pid()) -> ok | {error, _}.
-reset(_Db, _Stmt, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc
-%%
--spec finalize(raw_connection(), raw_statement(), reference(), pid()) -> ok | {error, _}.
-finalize(_Db, _Stmt, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Bind parameters to a prepared statement.
-%%
--spec bind(raw_connection(), raw_statement(), reference(), pid(), list(any())) -> ok | {error, _}.
-bind(_Db, _Stmt, _Ref, _Dest, _Args) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Retrieve the column names of the prepared statement
-%%
--spec column_names(raw_connection(), raw_statement(), reference(), pid()) -> ok | {error, _}.
-column_names(_Db, _Stmt, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Retrieve the column types of the prepared statement
-%%
--spec column_types(raw_connection(), raw_statement(), reference(), pid()) -> ok | {error, _}.
-column_types(_Db, _Stmt, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Initialize a backup procedure of a database.
--spec backup_init(raw_connection(), string(), raw_connection(), string(), reference(), pid()) -> ok | {error, _}.
-backup_init(_DestDb, _DestName, _SourceDb, _SourceName, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Do a backup step.
--spec backup_step(raw_connection(), raw_backup(), integer(), reference(), pid()) -> ok | {error, _}.
-backup_step(_Db, _Backup, _NPages, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get the amount of remaining pages which need to be backed up.
--spec backup_remaining(raw_connection(), raw_backup(), reference(), pid()) -> ok | {error, _}.
-backup_remaining(_Db, _Backup, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get the total number of pages which need to be backed up.
--spec backup_pagecount(raw_connection(), raw_backup(), reference(), pid()) -> ok | {error, _}.
-backup_pagecount(_Db, _Backup, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Finish the backup.
--spec backup_finish(raw_connection(), raw_backup(), reference(), pid()) -> ok | {error, _}.
-backup_finish(_Db, _Backup, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Interrupt all active queries.
--spec interrupt(raw_connection()) -> ok.
-interrupt(_Db) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Close the connection.
-%%
--spec close(raw_connection(), reference(), pid()) -> ok | {error, _}.
-close(_Db, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Insert record
-%%
--spec insert(raw_connection(), reference(), pid(), sql()) -> ok | {error, _}.
-insert(_Db, _Ref, _Dest, _Sql) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get the last insert rowid.
-%%
--spec last_insert_rowid(raw_connection(), reference(), pid()) -> ok | {error, _}.
-last_insert_rowid(_Db, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get automcommit
-%%
--spec get_autocommit(raw_connection(), reference(), pid()) -> ok | {error, _}.
-get_autocommit(_Db, _Ref, _Dest) ->
-    erlang:nif_error(nif_library_not_loaded).
+ 
 

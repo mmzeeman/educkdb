@@ -33,52 +33,27 @@ static ErlNifResourceType *esqlite_connection_type = NULL;
 static ErlNifResourceType *esqlite_statement_type = NULL;
 static ErlNifResourceType *esqlite_backup_type = NULL;
 
+typedef struct {
+    duckdb_database *database;
+} educkdb_database;
+
 /* database connection context */
 typedef struct {
     ErlNifTid tid;
     ErlNifThreadOpts* opts;
-    ErlNifPid notification_pid;
 
-    sqlite3 *db;
+    duckdb_connection *connection;
     queue *commands;
 
-} esqlite_connection;
-
-/* prepared statement */
-typedef struct {
-    sqlite3_stmt *statement;
-} esqlite_statement;
-
-/* data associated with ongoing backup */
-typedef struct {
-    sqlite3_backup *backup;
-} esqlite_backup;
+} educkdb_connection;
 
 typedef enum {
     cmd_unknown,
-    cmd_open,
-    cmd_update_hook_set,
-    cmd_notification,
-    cmd_exec,
-    cmd_changes,
-    cmd_prepare,
-    cmd_bind,
-    cmd_multi_step,
-    cmd_reset,
-    cmd_column_names,
-    cmd_column_types,
 
-    cmd_backup_init,
-    cmd_backup_step,
-    cmd_backup_remaining,
-    cmd_backup_pagecount,
-    cmd_backup_finish,
+    cmd_connect,
+    cmd_disconnect,
 
-    cmd_close,
     cmd_stop,
-    cmd_insert,
-    cmd_last_insert_rowid,
-    cmd_get_autocommit,
 } command_type;
 
 typedef struct {
@@ -87,13 +62,14 @@ typedef struct {
     ErlNifEnv *env;
     ERL_NIF_TERM ref;
     ErlNifPid pid;
+
     ERL_NIF_TERM arg;
     ERL_NIF_TERM stmt;
-} esqlite_command;
+} educkdb_command;
 
-static ERL_NIF_TERM atom_esqlite3;
+static ERL_NIF_TERM atom_educkdb;
 
-static ERL_NIF_TERM push_command(ErlNifEnv *env, esqlite_connection *conn, esqlite_command *cmd);
+static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
 static ERL_NIF_TERM
 make_atom(ErlNifEnv *env, const char *atom_name)
@@ -101,7 +77,7 @@ make_atom(ErlNifEnv *env, const char *atom_name)
     ERL_NIF_TERM atom;
 
     if(enif_make_existing_atom(env, atom_name, &atom, ERL_NIF_LATIN1))
-	   return atom;
+        return atom;
 
     return enif_make_atom(env, atom_name);
 }
@@ -118,83 +94,15 @@ make_error_tuple(ErlNifEnv *env, const char *reason)
     return enif_make_tuple2(env, make_atom(env, "error"), make_atom(env, reason));
 }
 
-static ERL_NIF_TERM
-make_row_tuple(ErlNifEnv *env, ERL_NIF_TERM value)
-{
-    return enif_make_tuple2(env, make_atom(env, "row"), value);
-}
-
-static const char *
-get_sqlite3_return_code_msg(int r)
-{
-    switch(r) {
-        case SQLITE_OK: return "ok";
-        case SQLITE_ERROR : return "sqlite_error";
-        case SQLITE_INTERNAL: return "internal";
-        case SQLITE_PERM: return "perm";
-        case SQLITE_ABORT: return "abort";
-        case SQLITE_BUSY: return "busy";
-        case SQLITE_LOCKED: return  "locked";
-        case SQLITE_NOMEM: return  "nomem";
-        case SQLITE_READONLY: return  "readonly";
-        case SQLITE_INTERRUPT: return  "interrupt";
-        case SQLITE_IOERR: return  "ioerror";
-        case SQLITE_CORRUPT: return  "corrupt";
-        case SQLITE_NOTFOUND: return  "notfound";
-        case SQLITE_FULL: return  "full";
-        case SQLITE_CANTOPEN: return  "cantopen";
-        case SQLITE_PROTOCOL: return  "protocol";
-        case SQLITE_EMPTY: return  "empty";
-        case SQLITE_SCHEMA: return  "schema";
-        case SQLITE_TOOBIG: return  "toobig";
-        case SQLITE_CONSTRAINT: return  "constraint";
-        case SQLITE_MISMATCH: return  "mismatch";
-        case SQLITE_MISUSE: return  "misuse";
-        case SQLITE_NOLFS: return  "nolfs";
-        case SQLITE_AUTH: return  "auth";
-        case SQLITE_FORMAT: return  "format";
-        case SQLITE_RANGE: return  "range";
-        case SQLITE_NOTADB: return  "notadb";
-        case SQLITE_ROW: return  "row";
-        case SQLITE_DONE: return  "done";
-    }
-    
-    return  "unknown";
-}
-
-static const char *
-get_sqlite3_error_msg(int error_code, sqlite3 *db)
-{
-    static const char *msg;
-
-    if(error_code == SQLITE_MISUSE)
-        return "Sqlite3 was invoked incorrectly.";
-
-    msg = sqlite3_errmsg(db);
-    if(!msg)
-        return "No sqlite3 error message found.";
-
-    return msg;
-}
-
-static ERL_NIF_TERM
-make_sqlite3_error_tuple(ErlNifEnv *env, int error_code, sqlite3 *db)
-{
-    const char *error_code_msg = get_sqlite3_return_code_msg(error_code);
-    const char *msg = get_sqlite3_error_msg(error_code, db);
-
-    return enif_make_tuple2(env, make_atom(env, "error"),
-        enif_make_tuple2(env, make_atom(env, error_code_msg),
-            enif_make_string(env, msg, ERL_NIF_LATIN1)));
-}
-
 static void
 command_destroy(void *obj)
 {
-    esqlite_command *cmd = (esqlite_command *) obj;
+    educkdb_command *cmd = (educkdb_command *) obj;
 
-    if(cmd->env != NULL)
+    if(cmd->env != NULL) {
         enif_free_env(cmd->env);
+        cmd->env = NULL;
+    }
 
     enif_free(cmd);
 }
@@ -202,7 +110,7 @@ command_destroy(void *obj)
 static esqlite_command *
 command_create()
 {
-    esqlite_command *cmd = (esqlite_command *) enif_alloc(sizeof(esqlite_command));
+    educkdb_command *cmd = (educkdb_command *) enif_alloc(sizeof(educkdb_command));
     if(cmd == NULL)
         return NULL;
 
@@ -224,52 +132,44 @@ command_create()
  *
  */
 static void
-destruct_esqlite_connection(ErlNifEnv *env, void *arg)
+destruct_educkdb_connection(ErlNifEnv *env, void *arg)
 {
-    esqlite_connection *db = (esqlite_connection *) arg;
-    esqlite_command *cmd = command_create();
+    educkdb_connection *conn = (educkdb_connection *) arg;
+    educkdb_command *cmd;
+   
+    if(conn->tid) { 
+        cmd = command_create();
+        if(cmd) {
+            /* Send the stop command to the command thread.
+            */
+            cmd->type = cmd_stop;
+            queue_push(conn->commands, cmd);
 
-    /* Send the stop command
-     */
-    cmd->type = cmd_stop;
-    queue_push(db->commands, cmd);
+            /* Wait for the thread to finish
+            */
+            enif_thread_join(conn->tid, NULL);
+        }
+        enif_thread_exit(conn->tid, NULL);
+        enif_thread_opts_destroy(conn->opts);
 
-    /* Wait for the thread to finish
-     */
-    enif_thread_join(db->tid, NULL);
-
-    enif_thread_opts_destroy(db->opts);
-
-    /* The thread has finished... now remove the command queue, and close
-     * the database (if it was still open).
-     */
-    while(queue_has_item(db->commands)) {
-        command_destroy(queue_pop(db->commands));
-    }
-    queue_destroy(db->commands);
-
-    sqlite3_close_v2(db->db);
-    db->db = NULL;
-}
-
-static void
-destruct_esqlite_statement(ErlNifEnv *env, void *arg)
-{
-    esqlite_statement *stmt = (esqlite_statement *) arg;
-    sqlite3_finalize(stmt->statement);
-    stmt->statement = NULL;
-}
-
-static void
-destruct_esqlite_backup(ErlNifEnv *env, void *arg) 
-{
-    esqlite_backup *backup = (esqlite_backup *) arg;
-    
-    if(backup->backup) {
-        sqlite3_backup_finish(backup->backup);
+        conn->tid = NULL;
     }
 
-    backup->backup = NULL;
+    if(conn->commands) {
+        /* The thread has finished... now remove the command queue, and close
+         * the database (if it was still open).
+         */
+        while(queue_has_item(conn->commands)) {
+            command_destroy(queue_pop(conn->commands));
+        }
+        queue_destroy(conn->commands);
+        conn->commands = NULL;
+    }
+
+    if(conn->connection) {
+        duckdb_disconnect(conn->connection);
+        conn->connection = NULL;
+    }
 }
 
 static ERL_NIF_TERM
@@ -1738,30 +1638,10 @@ static int on_upgrade(ErlNifEnv* env, void** priv, void** old_priv_data, ERL_NIF
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"start", 0, esqlite_start},
-    {"open", 4, esqlite_open},
-    {"set_update_hook", 4, set_update_hook},
-    {"exec", 4, esqlite_exec},
-    {"changes", 3, esqlite_changes},
-    {"prepare", 4, esqlite_prepare},
-    {"insert", 4, esqlite_insert},
-    {"last_insert_rowid", 3, esqlite_last_insert_rowid},
-    {"get_autocommit", 3, esqlite_get_autocommit},
-    {"multi_step", 5, esqlite_multi_step},
-    {"reset", 4, esqlite_reset},
-    // TODO: {"esqlite_bind", 3, esqlite_bind_named},
-    {"bind", 5, esqlite_bind},
-    {"column_names", 4, esqlite_column_names},
-    {"column_types", 4, esqlite_column_types},
-
-    {"backup_init", 6, esqlite_backup_init},
-    {"backup_step", 5, esqlite_backup_step},
-    {"backup_remaining", 4, esqlite_backup_remaining},
-    {"backup_pagecount", 4, esqlite_backup_pagecount},
-    {"backup_finish", 4, esqlite_backup_finish},
-
-    {"interrupt", 1, esqlite_interrupt, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"close", 3, esqlite_close}
+    {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"connect", 1, educkdb_connect},
+    {"disconnect", 1, educkdb_disconnect},
+    {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND}
 };
 
 ERL_NIF_INIT(esqlite3_nif, nif_funcs, on_load, on_reload, on_upgrade, NULL);
