@@ -26,17 +26,18 @@
 #include "queue.h"
 
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
+#define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
+
 /*
-static ErlNifResourceType *esqlite_statement_type = NULL;
-static ErlNifResourceType *esqlite_backup_type = NULL;
+static ErlNifResourceType *educkdb_statement_type = NULL;
 */
 
 /* Database referend */
 typedef struct {
-    duckdb_database *database;
+    duckdb_database database;
 } educkdb_database;
 
 /* Database connection context and thread */
@@ -129,6 +130,17 @@ command_create()
     return cmd;
 }
 
+/*
+ *
+ */
+static void
+destruct_educkdb_database(ErlNifEnv *env, void *arg)
+{
+    educkdb_database *database = (educkdb_database *) arg;
+
+    duckdb_close(&(database->database));
+}
+ 
 /*
  *
  */
@@ -331,23 +343,35 @@ esqlite_start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 static ERL_NIF_TERM
 educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+    char filename[MAX_PATHNAME];
+    unsigned int size;
+    educkdb_database *database;
+    ERL_NIF_TERM educkdb_database;
+    duckdb_state rc;
+
     if(argc != 2)
         return enif_make_badarg(env);
 
-    /*
-    if(!enif_get_resource(env, argv[0], esqlite_connection_type, (void **) &db))
-        return enif_make_badarg(env);
+    size = enif_get_string(env, argv[0], filename, MAX_PATHNAME, ERL_NIF_LATIN1);
+    if(size <= 0)
+        return make_error_tuple(env, "filename");
 
-    if(!enif_is_ref(env, argv[1]))
-        return make_error_tuple(env, "invalid_ref");
+    /* [TODO] get options from the second attribute */
 
-    if(!enif_get_local_pid(env, argv[2], &pid))
-        return make_error_tuple(env, "invalid_pid");
+    database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database_type));
+    if(!database)
+        return make_error_tuple(env, "no_memory");
 
-    */
+    rc = duckdb_open(filename, &(database->database));
+    if(rc == DuckDBError) {
+        // [TODO] get a detailed error message.
+        return enif_make_atom(env, "error");
+    }
 
+    educkdb_database = enif_make_resource(env, database);
+    enif_release_resource(database);
 
-    return enif_make_atom(env, "ok");
+    return make_ok_tuple(env, educkdb_database);
 }
 
 /*
@@ -358,21 +382,15 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 static ERL_NIF_TERM
 educkdb_close(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+    educkdb_database *db;
+
     if(argc != 1)
         return enif_make_badarg(env);
 
-    /*
-    if(!enif_get_resource(env, argv[0], esqlite_connection_type, (void **) &db))
+    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db))
         return enif_make_badarg(env);
 
-    if(!enif_is_ref(env, argv[1]))
-        return make_error_tuple(env, "invalid_ref");
-
-    if(!enif_get_local_pid(env, argv[2], &pid))
-        return make_error_tuple(env, "invalid_pid");
-
-    */
-
+    duckdb_close(&(db->database));
 
     return enif_make_atom(env, "ok");
 }
@@ -441,6 +459,11 @@ static int
 on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
     ErlNifResourceType *rt;
+
+    rt = enif_open_resource_type(env, "educkdb_nif", "educkdb_database_type", destruct_educkdb_database,
+            ERL_NIF_RT_CREATE, NULL);
+    if(!rt) return -1;
+    educkdb_database_type = rt;
 
     rt = enif_open_resource_type(env, "educkdb_nif", "educkdb_connection_type", destruct_educkdb_connection,
             ERL_NIF_RT_CREATE, NULL);
