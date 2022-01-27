@@ -14,7 +14,7 @@ DrvLdFlags =
     end.
 
 {NifSources, LdEnv, CFlagsExt, CXXFlagsExt} =
-    {NifStaticSources, [], "-Ic_src/duckdb", ""}.
+    {NifStaticSources, [], " -Ic_src/duckdb", ""}.
 
 CFlags =
     case os:getenv("EDUCKDB_CFLAGS") of
