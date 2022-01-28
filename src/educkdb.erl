@@ -27,11 +27,6 @@
     disconnect/1
 ]).
 
--export([
-    connect_cmd/1,
-    disconnect_cmd/1
-]).
-
 -type raw_database() :: reference().
 -type raw_connection() :: reference().
 -type raw_statement() :: reference().
@@ -65,19 +60,7 @@ open(_Filename, _Options) ->
 %%      connection in a single process.
 %%
 -spec connect(raw_database()) -> {ok, raw_connection()} | {error, _}.
-connect(Db) ->
-    case connect_cmd(Db) of
-        {ok, Ref} ->
-            receive
-                {connect, Ref, Answer} -> Answer
-            end;
-        {error, _}=E ->
-            E
-    end.
-
-%% After calling the calling pid will receive
-%% the message {connect, Ref, {ok, raw_connection()} | {error, _} }
-connect_cmd(_Db) ->
+connect(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
@@ -85,18 +68,7 @@ connect_cmd(_Db) ->
 %%      The calling pid will receive:
 %%      {disconnect, Ref, ok | {error, _}}.
 -spec disconnect(raw_connection()) -> ok | {error, _}.
-disconnect(Connection) ->
-    case disconnect_cmd(Connection) of
-        {ok, Ref} ->
-            receive
-                {disconnect, Ref, Answer} -> Answer
-            end;
-        {error, _}=E ->
-            E
-    end.
-
--spec disconnect_cmd(raw_connection()) -> {ok, reference()} | {error, _}.
-disconnect_cmd(_Connection) ->
+disconnect(_Connection) ->
     erlang:nif_error(nif_library_not_loaded).
                                  
 %% @doc Close the database. All open connections will become unusable.

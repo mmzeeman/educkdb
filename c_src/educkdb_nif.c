@@ -43,10 +43,9 @@ typedef struct {
 /* Database connection context and thread */
 typedef struct {
     ErlNifTid tid;
-    ErlNifThreadOpts* opts;
-
-    duckdb_connection *connection;
+    ErlNifThreadOpts *opts;
     queue *commands;
+    duckdb_connection connection;
 
 } educkdb_connection;
 
@@ -180,8 +179,7 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg)
     }
 
     if(conn->connection) {
-        duckdb_disconnect(conn->connection);
-        conn->connection = NULL;
+        duckdb_disconnect(&(conn->connection));
     }
 }
 
@@ -291,51 +289,6 @@ educkdb_connection_run(void *arg)
 }
 
 /*
- * Start the processing thread
- */
-/*
-static ERL_NIF_TERM
-esqlite_start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
-{
-    esqlite_connection *conn;
-    ERL_NIF_TERM db_conn;
-
-    // / * Initialize the resource * /
-    conn = enif_alloc_resource(esqlite_connection_type, sizeof(esqlite_connection));
-    if(!conn)
-        return make_error_tuple(env, "no_memory");
-
-    conn->db = NULL;
-
-    / * Create command queue * /
-    conn->commands = queue_create();
-    if(!conn->commands) {
-        enif_release_resource(conn);
-        return make_error_tuple(env, "command_queue_create_failed");
-    }
-
-    / * Start command processing thread * /
-    conn->opts = enif_thread_opts_create("esqlite_thread_opts");
-    if(conn->opts == NULL) {
-        return make_error_tuple(env, "thread_opts_failed");
-    }
-
-    conn->opts->suggested_stack_size = 128; 
-
-    if(enif_thread_create("esqlite_connection", &conn->tid, esqlite_connection_run, conn, conn->opts) != 0) {
-        enif_thread_opts_destroy(conn->opts);
-        enif_release_resource(conn);
-        return make_error_tuple(env, "thread_create_failed");
-    }
-
-    db_conn = enif_make_resource(env, conn);
-    enif_release_resource(conn);
-
-    return make_ok_tuple(env, db_conn);
-}
-*/
-
-/*
  * Open the database. 
  *
  * Note: dirty nif call.
@@ -364,7 +317,7 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
     rc = duckdb_open(filename, &(database->database));
     if(rc == DuckDBError) {
-        // [TODO] get a detailed error message.
+        // [TODO] use duckdb_open_ext, it can report back error messages.
         return enif_make_atom(env, "error");
     }
 
@@ -403,24 +356,63 @@ educkdb_close(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
  *
  */
 static ERL_NIF_TERM
-educkdb_connect_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+    educkdb_database *db;
+    educkdb_connection *conn;
+    duckdb_state rc;
+    ERL_NIF_TERM db_conn;
+
     if(argc != 1)
         return enif_make_badarg(env);
 
-    /*
-    if(!enif_get_resource(env, argv[0], esqlite_connection_type, (void **) &db))
+    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db))
         return enif_make_badarg(env);
 
-    if(!enif_is_ref(env, argv[1]))
-        return make_error_tuple(env, "invalid_ref");
+    /* Initialize the connection resource */
+    conn = enif_alloc_resource(educkdb_connection_type, sizeof(educkdb_connection));
+    if(!conn) {
+        return make_error_tuple(env, "no_memory");
+    }
 
-    if(!enif_get_local_pid(env, argv[2], &pid))
-        return make_error_tuple(env, "invalid_pid");
+    /* Connect to the database */
+    rc = duckdb_connect(db->database, &(conn->connection));
+    if(rc == DuckDBError) {
+        enif_release_resource(conn);
+        return make_error_tuple(env, "duckdb_connect");
+    }
+    
+    /* Create command queue */
+    conn->commands = queue_create();
+    if(!conn->commands) {
+        duckdb_close(&(conn->connection));
+        enif_release_resource(conn);
+        return make_error_tuple(env, "command_queue");
+    }
 
-    */
+    /* Start command processing thread */
+    conn->opts = enif_thread_opts_create("thread_opts");
+    if(conn->opts == NULL) {
+        duckdb_close(&(conn->connection));
+        queue_destroy(conn->commands);
+        enif_release_resource(conn);
+        return make_error_tuple(env, "thread_opts");
+    }
 
-    return enif_make_atom(env, "ok");
+    conn->opts->suggested_stack_size = 8192; 
+
+    if(enif_thread_create("educkdb_connection", &conn->tid, educkdb_connection_run, conn, conn->opts) != 0) {
+        duckdb_close(&(conn->connection));
+        queue_destroy(conn->commands);
+        enif_thread_opts_destroy(conn->opts);
+        enif_release_resource(conn);
+        return make_error_tuple(env, "thread_create");
+    }
+
+    db_conn = enif_make_resource(env, conn);
+    enif_release_resource(conn);
+
+    return make_ok_tuple(env, db_conn);
 }
 
 /*
@@ -430,22 +422,22 @@ educkdb_connect_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
  *
  */
 static ERL_NIF_TERM
-educkdb_disconnect_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-    if(argc != 1)
+    educkdb_connection *conn;
+
+    if(argc != 1) {
         return enif_make_badarg(env);
+    }
 
-    /*
-    if(!enif_get_resource(env, argv[0], esqlite_connection_type, (void **) &db))
+    if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
         return enif_make_badarg(env);
+    }
 
-    if(!enif_is_ref(env, argv[1]))
-        return make_error_tuple(env, "invalid_ref");
-
-    if(!enif_get_local_pid(env, argv[2], &pid))
-        return make_error_tuple(env, "invalid_pid");
-
-    */
+    /* Simply call destruct, so the thread stops and disconnect.
+     * Note: this will immediately remove all commands from the queue.
+     */
+    destruct_educkdb_connection(env, (void *)conn);
 
     return enif_make_atom(env, "ok");
 }
@@ -495,8 +487,8 @@ static int on_upgrade(ErlNifEnv* env, void** priv, void** old_priv_data, ERL_NIF
 static ErlNifFunc nif_funcs[] = {
     {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"connect_cmd", 1, educkdb_connect_cmd},
-    {"disconnect_cmd", 1, educkdb_disconnect_cmd}
+    {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND}
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);
