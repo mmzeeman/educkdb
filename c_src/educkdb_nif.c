@@ -35,7 +35,7 @@ static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_statement_type = NULL;
 */
 
-/* Database referend */
+/* Database reference */
 typedef struct {
     duckdb_database database;
 } educkdb_database;
@@ -49,11 +49,14 @@ typedef struct {
 
 } educkdb_connection;
 
+typedef struct {
+    duckdb_result result;
+} educkdb_result;
+
 typedef enum {
     cmd_unknown,
 
-    cmd_connect,
-    cmd_disconnect,
+    cmd_query,
 
     cmd_stop
 } command_type;
@@ -70,6 +73,9 @@ typedef struct {
 } educkdb_command;
 
 static ERL_NIF_TERM atom_educkdb;
+static ERL_NIF_TERM atom_ok;
+static ERL_NIF_TERM atom_error;
+
 static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
 static ERL_NIF_TERM
@@ -86,13 +92,13 @@ make_atom(ErlNifEnv *env, const char *atom_name)
 static ERL_NIF_TERM
 make_ok_tuple(ErlNifEnv *env, ERL_NIF_TERM value)
 {
-    return enif_make_tuple2(env, make_atom(env, "ok"), value);
+    return enif_make_tuple2(env, atom_ok, value);
 }
 
 static ERL_NIF_TERM
 make_error_tuple(ErlNifEnv *env, const char *reason)
 {
-    return enif_make_tuple2(env, make_atom(env, "error"), make_atom(env, reason));
+    return enif_make_tuple2(env, atom_error, make_atom(env, reason));
 }
 
 static void
@@ -183,6 +189,32 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg)
     }
 }
 
+static ERL_NIF_TERM
+do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
+{
+    ErlNifBinary bin;
+    duckdb_state rc;
+    duckdb_result result;
+    ERL_NIF_TERM eos = enif_make_int(env, 0);
+    char *error_msg;
+
+    enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin);
+
+    rc = duckdb_query(conn->connection, (char *) bin.data, &result);
+
+    if(rc == DuckDBError) {
+        error_msg = duckdb_result_error(&result);
+        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+        duckdb_destroy_result(&result);
+
+        return enif_make_tuple2(env, atom_error,
+                enif_make_tuple2(env,
+                    make_atom(env, "result"), erl_error_msg));
+    }
+
+    duckdb_destroy_result(&result);
+    return atom_ok;
+}
 
 
 static ERL_NIF_TERM
@@ -199,50 +231,8 @@ evaluate_command(educkdb_command *cmd, educkdb_connection *conn)
     */
 
     switch(cmd->type) {
-        /*
-        case cmd_open:
-            return do_open(cmd->env, conn, cmd->arg);
-        case cmd_update_hook_set:
-            return do_set_update_hook(cmd->env, conn, cmd->arg);
-        case cmd_exec:
-            return do_exec(cmd->env, conn, cmd->arg);
-        case cmd_changes:
-            return do_changes(cmd->env, conn, cmd->arg);
-        case cmd_prepare:
-            return do_prepare(cmd->env, conn, cmd->arg);
-        case cmd_multi_step:
-            return do_multi_step(cmd->env, conn->db, stmt->statement, cmd->arg);
-        case cmd_reset:
-            return do_reset(cmd->env, conn->db, stmt->statement);
-        case cmd_bind:
-            return do_bind(cmd->env, conn->db, stmt->statement, cmd->arg);
-        case cmd_column_names:
-            return do_column_names(cmd->env, stmt->statement);
-        case cmd_column_types:
-            return do_column_types(cmd->env, stmt->statement);
-        case cmd_backup_init:
-            return do_backup_init(cmd->env, conn->db, cmd->arg);
-        case cmd_backup_step:
-            return do_backup_step(cmd->env, conn->db, cmd->arg);
-        case cmd_backup_remaining:
-            return do_backup_remaining(cmd->env, cmd->arg);
-        case cmd_backup_pagecount:
-            return do_backup_pagecount(cmd->env, cmd->arg);
-        case cmd_backup_finish:
-            return do_backup_finish(cmd->env, cmd->arg);
-        case cmd_close:
-            return do_close(cmd->env, conn, cmd->arg);
-        case cmd_last_insert_rowid:
-            return do_last_insert_rowid(cmd->env, conn);
-        case cmd_insert:
-            return do_insert(cmd->env, conn, cmd->arg);
-        case cmd_get_autocommit:
-            return do_get_autocommit(cmd->env, conn);
-        */
-        case cmd_connect:
-            /* [TODO] can be a no-op to make sure the thread and queue is functioning. */
-        case cmd_disconnect:
-            /* [TODO] */
+        case cmd_query:
+            return do_query(cmd->env, conn, cmd->arg);
         case cmd_unknown:      // not handled
         case cmd_stop:         // not handled here
             break;
@@ -257,7 +247,7 @@ push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd) {
     if(!queue_push(conn->commands, cmd))
         return make_error_tuple(env, "command_push_failed");
 
-    return make_atom(env, "ok");
+    return atom_ok;
 }
 
 static ERL_NIF_TERM
@@ -318,7 +308,7 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     rc = duckdb_open(filename, &(database->database));
     if(rc == DuckDBError) {
         // [TODO] use duckdb_open_ext, it can report back error messages.
-        return enif_make_atom(env, "error");
+        return atom_error;
     }
 
     educkdb_database = enif_make_resource(env, database);
@@ -345,7 +335,7 @@ educkdb_close(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
     duckdb_close(&(db->database));
 
-    return enif_make_atom(env, "ok");
+    return atom_ok;
 }
 
 /*
@@ -416,7 +406,7 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 /*
- * disconnect_cmd
+ * disconnect
  *
  * Finalizes the communication thread, and disconnects the connection.
  *
@@ -439,9 +429,52 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
      */
     destruct_educkdb_connection(env, (void *)conn);
 
-    return enif_make_atom(env, "ok");
+    return atom_ok;
 }
 
+/*
+ * Query
+ */
+
+/*
+ * query_cmd
+ *
+ * Check the input values, and put the command on the queue to make
+ * sure queries are handled in one calling thread.
+ */
+static ERL_NIF_TERM
+educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_connection *conn;
+    educkdb_command *cmd = NULL;
+    ERL_NIF_TERM ref;
+    ERL_NIF_TERM r;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
+        return enif_make_badarg(env);
+    }
+
+    cmd = command_create();
+    if(!cmd) {
+        return make_error_tuple(env, "command_create");
+    }
+
+    cmd->type = cmd_query;
+    ref = enif_make_ref(env);
+    cmd->ref = enif_make_copy(cmd->env, ref);
+    enif_self(env, &(cmd->pid));
+    cmd->arg = enif_make_copy(cmd->env, argv[1]);
+
+    r = push_command(env, conn, cmd);
+    if(r == atom_ok) {
+        return make_ok_tuple(env, ref);
+    }
+
+    return r;
+}
 
 
 /*
@@ -470,6 +503,8 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     */
 
     atom_educkdb = make_atom(env, "educkdb");
+    atom_ok = make_atom(env, "ok");
+    atom_error = make_atom(env, "error");
 
     return 0;
 }
@@ -488,7 +523,8 @@ static ErlNifFunc nif_funcs[] = {
     {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND}
+    {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"query_cmd", 2, educkdb_query_cmd}
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);

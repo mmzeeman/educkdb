@@ -24,7 +24,15 @@
     close/1,
 
     connect/1,
-    disconnect/1
+    disconnect/1,
+
+    query/2
+]).
+
+%% low-level api
+
+-export([
+    query_cmd/2
 ]).
 
 -type raw_database() :: reference().
@@ -43,6 +51,10 @@ init() ->
                       Dir -> filename:join(Dir, NifName)
                   end,
     ok = erlang:load_nif(NifFileName, 0).
+
+%%
+%% Startup & Configure
+%%
 
 %% @doc Open, or create a duckdb database with default options.
 %%
@@ -74,6 +86,27 @@ disconnect(_Connection) ->
 %% @doc Close the database. All open connections will become unusable.
 -spec close(raw_database()) -> ok | {error, _}.
 close(_Db) ->
+    erlang:nif_error(nif_library_not_loaded).
+ 
+
+%%
+%% Query
+%%
+
+query(Conn, Sql) ->
+    case query_cmd(Conn, Sql) of
+        {ok, Ref} ->
+            receive 
+                {educkdb, Ref, Answer} -> Answer
+            end;
+        {error, _}=E ->
+            E
+    end.
+
+%% @doc Query the database. The answer is send back as a result to 
+%% the calling process.
+-spec query_cmd(raw_connection(), sql()) -> {ok, reference()} | {error, _}.
+query_cmd(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
  
 
