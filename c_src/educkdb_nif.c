@@ -198,7 +198,9 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
     ERL_NIF_TERM eos = enif_make_int(env, 0);
     char *error_msg;
 
-    enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin);
+    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin)) {
+        return make_error_tuple(env, "no_iodata");
+    }
 
     rc = duckdb_query(conn->connection, (char *) bin.data, &result);
 
