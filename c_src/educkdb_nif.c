@@ -30,6 +30,7 @@
 
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
+static ErlNifResourceType *educkdb_result_type = NULL;
 
 /*
 static ErlNifResourceType *educkdb_statement_type = NULL;
@@ -46,7 +47,6 @@ typedef struct {
     ErlNifThreadOpts *opts;
     queue *commands;
     duckdb_connection connection;
-
 } educkdb_connection;
 
 typedef struct {
@@ -75,6 +75,10 @@ typedef struct {
 static ERL_NIF_TERM atom_educkdb;
 static ERL_NIF_TERM atom_ok;
 static ERL_NIF_TERM atom_error;
+static ERL_NIF_TERM atom_column;
+static ERL_NIF_TERM atom_null;
+static ERL_NIF_TERM atom_true;
+static ERL_NIF_TERM atom_false;
 
 static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
@@ -83,8 +87,9 @@ make_atom(ErlNifEnv *env, const char *atom_name)
 {
     ERL_NIF_TERM atom;
 
-    if(enif_make_existing_atom(env, atom_name, &atom, ERL_NIF_LATIN1))
+    if(enif_make_existing_atom(env, atom_name, &atom, ERL_NIF_LATIN1)) {
         return atom;
+    }
 
     return enif_make_atom(env, atom_name);
 }
@@ -100,6 +105,24 @@ make_error_tuple(ErlNifEnv *env, const char *reason)
 {
     return enif_make_tuple2(env, atom_error, make_atom(env, reason));
 }
+
+static ERL_NIF_TERM
+make_binary(ErlNifEnv *env, const void *bytes, unsigned int size)
+{
+    ErlNifBinary blob;
+    ERL_NIF_TERM term;
+
+    if(!enif_alloc_binary(size, &blob)) {
+        return atom_error;
+    }
+
+    memcpy(blob.data, bytes, size);
+    term = enif_make_binary(env, &blob);
+    enif_release_binary(&blob);
+
+    return term;
+}
+
 
 static void
 command_destroy(void *obj)
@@ -150,8 +173,7 @@ destruct_educkdb_database(ErlNifEnv *env, void *arg)
  *
  */
 static void
-destruct_educkdb_connection(ErlNifEnv *env, void *arg)
-{
+destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
     educkdb_connection *conn = (educkdb_connection *) arg;
     educkdb_command *cmd;
    
@@ -184,38 +206,86 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg)
         conn->commands = NULL;
     }
 
-    if(conn->connection) {
-        duckdb_disconnect(&(conn->connection));
+    duckdb_disconnect(&(conn->connection));
+}
+
+static const char*
+duckdb_type_name(duckdb_type t) {
+    switch(t) {
+        case DUCKDB_TYPE_INVALID:   return "invalid";
+        case DUCKDB_TYPE_BOOLEAN:   return "boolean";
+        case DUCKDB_TYPE_TINYINT:   return "tinyint";
+        case DUCKDB_TYPE_SMALLINT:  return "smallint";
+        case DUCKDB_TYPE_INTEGER:   return "integer";
+        case DUCKDB_TYPE_BIGINT:    return "bigint";
+        case DUCKDB_TYPE_UTINYINT:  return "tinyint";
+        case DUCKDB_TYPE_USMALLINT: return "smallint";
+        case DUCKDB_TYPE_UINTEGER:  return "uinteger";
+        case DUCKDB_TYPE_UBIGINT:   return "ubigint";
+        case DUCKDB_TYPE_FLOAT:     return "float";
+        case DUCKDB_TYPE_DOUBLE:    return "double";
+        case DUCKDB_TYPE_TIMESTAMP: return "timestamp";
+        case DUCKDB_TYPE_DATE:      return "date";
+        case DUCKDB_TYPE_TIME:      return "time";
+        case DUCKDB_TYPE_INTERVAL:  return "interval";
+        case DUCKDB_TYPE_HUGEINT:   return "hugeint";
+        case DUCKDB_TYPE_VARCHAR:   return "varchar";
+        case DUCKDB_TYPE_BLOB:      return "blob";
     }
 }
+
+/*
+ * Destroy a materialized result
+ */
+static void
+destruct_educkdb_result(ErlNifEnv *env, void *arg) {
+    educkdb_result *res = (educkdb_result *) arg;
+    duckdb_destroy_result(&(res->result));
+}
+
 
 static ERL_NIF_TERM
 do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
 {
     ErlNifBinary bin;
     duckdb_state rc;
-    duckdb_result result;
+    educkdb_result *result;
     ERL_NIF_TERM eos = enif_make_int(env, 0);
+    ERL_NIF_TERM eresult;
     char *error_msg;
 
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin)) {
         return make_error_tuple(env, "no_iodata");
     }
 
-    rc = duckdb_query(conn->connection, (char *) bin.data, &result);
+    result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result_type));
+    if(!result) {
+        return make_error_tuple(env, "no_memory");
+    }
+
+    /* Run the query, this is handled in a separate thread started by the nif to
+     * prevent it from hijacking the vm's scheduler for too long.
+     * The result datastructure is passed back
+     */
+    rc = duckdb_query(conn->connection, (char *) bin.data, &(result->result));
 
     if(rc == DuckDBError) {
-        error_msg = duckdb_result_error(&result);
+        /* Don't pass errors as a result data structure, but as an error tuple
+         * with the error message in it.
+         */
+        error_msg = duckdb_result_error(&(result->result));
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
-        duckdb_destroy_result(&result);
+        enif_release_resource(result);
 
         return enif_make_tuple2(env, atom_error,
                 enif_make_tuple2(env,
                     make_atom(env, "result"), erl_error_msg));
     }
 
-    duckdb_destroy_result(&result);
-    return atom_ok;
+    eresult = enif_make_resource(env, result);
+    enif_release_resource(result);
+
+    return make_ok_tuple(env, eresult);
 }
 
 
@@ -367,7 +437,9 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return make_error_tuple(env, "no_memory");
     }
 
-    /* Connect to the database */
+    /* Connect to the database. Internally this can mean the new connections
+     * has to wait on a lock from the database connection manager. So this 
+     * call must be dirty */
     rc = duckdb_connect(db->database, &(conn->connection));
     if(rc == DuckDBError) {
         enif_release_resource(conn);
@@ -478,6 +550,132 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return r;
 }
 
+/*
+static ERL_NIF_TERM
+make_cell(ErlNifEnv *env, duckdb_type type, void data) {
+    switch(t) {
+        case DUCKDB_TYPE_BOOLEAN:
+            if(*data) {
+                return atom_true;
+            } else {
+                return atom_false;
+            }
+        case DUCKDB_TYPE_TINYINT:
+            return enif_make_int(env, (int8_t)data);
+        case DUCKDB_TYPE_SMALLINT:
+            return enif_make_int(env, (int16_t)data);
+        case DUCKDB_TYPE_INTEGER:
+            return enif_make_int(env, (int32_t)data);
+        case DUCKDB_TYPE_BIGINT:
+            return enif_make_int64(env, (int64_t)data);
+        case DUCKDB_TYPE_UTINYINT:
+            return enif_make_uint(env, (uint8_t)data);
+        case DUCKDB_TYPE_USMALLINT:
+            return enif_make_uint(env, (uint16_t)data);
+        case DUCKDB_TYPE_UINTEGER:
+            return enif_make_uint(env, (uint32_t)data);
+        case DUCKDB_TYPE_UBIGINT:
+            return enif_make_uint64(env, (uint64_t)data);
+        case DUCKDB_TYPE_FLOAT:
+            return enif_make_double(env, (float)data);
+        case DUCKDB_TYPE_DOUBLE:
+            return enif_make_double(env, (double)data);
+        case DUCKDB_TYPE_TIMESTAMP:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_DATE:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_TIME:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_INTERVAL:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_HUGEINT:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_VARCHAR:
+            return make_atom(env, "todo");
+        case DUCKDB_TYPE_BLOB:
+            return make_atom(env, "todo");
+        default:
+            return atom_error;
+    }
+}
+*/
+
+
+static ERL_NIF_TERM
+educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    idx_t c, r;
+    idx_t row_count, column_count;
+    const char *column_name;
+    const char *column_type_name;
+    unsigned int column_name_len;
+
+    ERL_NIF_TERM column_info;
+    ERL_NIF_TERM column_info_tuple;
+    ERL_NIF_TERM rows, row, cell;
+
+    ERL_NIF_TERM type_atom;
+    ERL_NIF_TERM name_binary;
+
+    ErlNifBinary bin_column_name;
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+
+    /* for small number of results we can directly return the results without
+     * rescheduling the nif.
+     *
+     * [TODO] find out how much cells we can handle in about 1ms.
+     */
+
+    /* Column info */
+    row_count = duckdb_row_count(&(res->result));
+    column_count = duckdb_column_count(&(res->result));
+    column_info = enif_make_list(env, 0);
+
+    /* The row count can be 0, while the column_info still contains data, so we 
+     * have to prevent to return column info when there are no rows.
+     **/
+    if(row_count) {
+        for(c=column_count; c-- > 0; ) {
+            column_name = duckdb_column_name(&(res->result), c);
+            column_type_name = duckdb_type_name(duckdb_column_type(&(res->result), c));
+
+            name_binary = make_binary(env, column_name, strlen(column_name));
+            if(name_binary == atom_error) {
+                /* [todo] handle error */
+            }
+
+            type_atom = make_atom(env, column_type_name);
+            column_info_tuple = enif_make_tuple3(env, atom_column, name_binary, type_atom);
+            column_info = enif_make_list_cell(env, column_info_tuple, column_info);
+        }
+    }
+
+    /* Rows */
+    rows = enif_make_list(env, 0);
+    for(r=row_count; r-- > 0; ) {
+        row = enif_make_list(env, 0);
+
+        bool *nullmask = duckdb_nullmask_data(&(res->result), r);
+        void *column_data = duckdb_column_data(&(res->result), r);
+
+        for(c=column_count; c-- > 0; ) {
+            if(nullmask[c]) {
+                cell = atom_null;
+            } else {
+                cell = make_atom(env, "todo"); //make_cell(env, duckdb_column_type(&(res->result)), column_data[r]);
+            }
+            row = enif_make_list_cell(env, cell, row);
+        }
+        rows = enif_make_list_cell(env, row, rows);
+    }
+        
+    return enif_make_tuple3(env, atom_ok, column_info, rows);
+}
+
 
 /*
  * Load the nif. Initialize some stuff and such
@@ -485,17 +683,18 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 static int
 on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
-    ErlNifResourceType *rt;
-
-    rt = enif_open_resource_type(env, "educkdb_nif", "educkdb_database_type", destruct_educkdb_database,
+    educkdb_database_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_database_type", destruct_educkdb_database,
             ERL_NIF_RT_CREATE, NULL);
-    if(!rt) return -1;
-    educkdb_database_type = rt;
+    if(!educkdb_database_type) return -1;
 
-    rt = enif_open_resource_type(env, "educkdb_nif", "educkdb_connection_type", destruct_educkdb_connection,
+    educkdb_connection_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_connection_type", destruct_educkdb_connection,
             ERL_NIF_RT_CREATE, NULL);
-    if(!rt) return -1;
-    educkdb_connection_type = rt;
+    if(!educkdb_connection_type) return -1;
+
+    educkdb_result_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_result", destruct_educkdb_result,
+            ERL_NIF_RT_CREATE, NULL);
+    if(!educkdb_result_type) return -1;
+
 
     /*
     rt =  enif_open_resource_type(env, "educkdb_nif", "educkdb_statement_type", destruct_esqlite_statement,
@@ -507,6 +706,10 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_educkdb = make_atom(env, "educkdb");
     atom_ok = make_atom(env, "ok");
     atom_error = make_atom(env, "error");
+    atom_column = make_atom(env, "column");
+    atom_null = make_atom(env, "null");
+    atom_true = make_atom(env, "true");
+    atom_false = make_atom(env, "false");
 
     return 0;
 }
@@ -524,9 +727,14 @@ static int on_upgrade(ErlNifEnv* env, void** priv, void** old_priv_data, ERL_NIF
 static ErlNifFunc nif_funcs[] = {
     {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    
     {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"query_cmd", 2, educkdb_query_cmd}
+
+    {"query_cmd", 2, educkdb_query_cmd},
+
+    {"extract_result", 1, educkdb_extract_result}
+
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);

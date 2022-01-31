@@ -26,7 +26,9 @@
     connect/1,
     disconnect/1,
 
-    query/2
+    query/2,
+
+    extract_result/1
 ]).
 
 %% low-level api
@@ -38,6 +40,7 @@
 -type raw_database() :: reference().
 -type raw_connection() :: reference().
 -type raw_statement() :: reference().
+-type raw_result() :: reference().
 -type sql() :: iodata(). 
 
 -export_type([raw_connection/0, raw_statement/0, sql/0]).
@@ -93,6 +96,10 @@ close(_Db) ->
 %% Query
 %%
 
+%% @doc Query the database. The answer the answer is returned immediately. 
+%% Special care has been taken to prevent blocking the scheduler. A reference
+%% to a result data structure will be returned. 
+-spec query(raw_connection(), sql()) -> {ok, raw_result()} | {error, _}.
 query(Conn, Sql) ->
     case query_cmd(Conn, Sql) of
         {ok, Ref} ->
@@ -108,5 +115,13 @@ query(Conn, Sql) ->
 -spec query_cmd(raw_connection(), sql()) -> {ok, reference()} | {error, _}.
 query_cmd(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
- 
+
+%%
+%% Results
+%%
+
+%% @doc Extract the values from the result.
+extract_result(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
+    
 
