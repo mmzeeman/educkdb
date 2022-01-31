@@ -104,4 +104,8 @@ Note: **via command thread**
 
 #### 
 
+## Implementation notes
+
+ * https://potatosalad.io/2017/08/05/latency-of-native-functions-for-erlang-and-elixir
+ * https://github.com/vinoski/bitwise
 
