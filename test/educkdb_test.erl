@@ -45,9 +45,9 @@ query_test() ->
     false = Res1 =:= Res2,
 
     ?assertEqual({ok, [], []}, educkdb:extract_result(Res1)),
-    ?assertEqual({ok, [{column, <<"Count">>, bigint}], [[todo]]}, educkdb:extract_result(Res2)),
+    ?assertEqual({ok, [{column, <<"Count">>, bigint}], [[1]]}, educkdb:extract_result(Res2)),
     ?assertEqual({ok, [{column, <<"id">>, integer},
-                       {column, <<"x">>, varchar}], [[todo, todo]]}, educkdb:extract_result(Res3)),
+                       {column, <<"x">>, varchar}], [[10, todo]]}, educkdb:extract_result(Res3)),
 
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),

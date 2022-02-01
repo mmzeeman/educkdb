@@ -550,36 +550,31 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return r;
 }
 
-/*
 static ERL_NIF_TERM
-make_cell(ErlNifEnv *env, duckdb_type type, void data) {
-    switch(t) {
+make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, idx_t row) {
+    switch(type) {
         case DUCKDB_TYPE_BOOLEAN:
-            if(*data) {
+            if(duckdb_value_boolean(result, col, row)) {
                 return atom_true;
             } else {
                 return atom_false;
             }
         case DUCKDB_TYPE_TINYINT:
-            return enif_make_int(env, (int8_t)data);
         case DUCKDB_TYPE_SMALLINT:
-            return enif_make_int(env, (int16_t)data);
         case DUCKDB_TYPE_INTEGER:
-            return enif_make_int(env, (int32_t)data);
+            return enif_make_int(env, duckdb_value_int32(result, col, row));
         case DUCKDB_TYPE_BIGINT:
-            return enif_make_int64(env, (int64_t)data);
+            return enif_make_int64(env, duckdb_value_int64(result, col, row));
         case DUCKDB_TYPE_UTINYINT:
-            return enif_make_uint(env, (uint8_t)data);
         case DUCKDB_TYPE_USMALLINT:
-            return enif_make_uint(env, (uint16_t)data);
         case DUCKDB_TYPE_UINTEGER:
-            return enif_make_uint(env, (uint32_t)data);
+            return enif_make_uint(env, duckdb_value_uint32(result, col, row));
         case DUCKDB_TYPE_UBIGINT:
-            return enif_make_uint64(env, (uint64_t)data);
+            return enif_make_uint64(env, duckdb_value_uint64(result, col, row));
         case DUCKDB_TYPE_FLOAT:
-            return enif_make_double(env, (float)data);
         case DUCKDB_TYPE_DOUBLE:
-            return enif_make_double(env, (double)data);
+            return enif_make_double(env, duckdb_value_double(result, col, row));
+
         case DUCKDB_TYPE_TIMESTAMP:
             return make_atom(env, "todo");
         case DUCKDB_TYPE_DATE:
@@ -598,7 +593,6 @@ make_cell(ErlNifEnv *env, duckdb_type type, void data) {
             return atom_error;
     }
 }
-*/
 
 
 static ERL_NIF_TERM
@@ -653,20 +647,22 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             column_info = enif_make_list_cell(env, column_info_tuple, column_info);
         }
     }
-
     /* Rows */
     rows = enif_make_list(env, 0);
     for(r=row_count; r-- > 0; ) {
         row = enif_make_list(env, 0);
 
         bool *nullmask = duckdb_nullmask_data(&(res->result), r);
-        void *column_data = duckdb_column_data(&(res->result), r);
 
         for(c=column_count; c-- > 0; ) {
             if(nullmask[c]) {
                 cell = atom_null;
             } else {
-                cell = make_atom(env, "todo"); //make_cell(env, duckdb_column_type(&(res->result)), column_data[r]);
+                cell = make_cell(env,
+                        duckdb_column_type(&(res->result), c),
+                        &(res->result),
+                        c, 
+                        r);
             }
             row = enif_make_list_cell(env, cell, row);
         }
