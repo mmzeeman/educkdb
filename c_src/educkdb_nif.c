@@ -552,6 +552,8 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
 static ERL_NIF_TERM
 make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, idx_t row) {
+    char *value;
+
     switch(type) {
         case DUCKDB_TYPE_BOOLEAN:
             if(duckdb_value_boolean(result, col, row)) {
@@ -574,19 +576,35 @@ make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, id
         case DUCKDB_TYPE_FLOAT:
         case DUCKDB_TYPE_DOUBLE:
             return enif_make_double(env, duckdb_value_double(result, col, row));
-
         case DUCKDB_TYPE_TIMESTAMP:
             return make_atom(env, "todo");
+
         case DUCKDB_TYPE_DATE:
             return make_atom(env, "todo");
+
         case DUCKDB_TYPE_TIME:
             return make_atom(env, "todo");
+
         case DUCKDB_TYPE_INTERVAL:
+            
             return make_atom(env, "todo");
+
         case DUCKDB_TYPE_HUGEINT:
+            // record with two 64 bit integers
             return make_atom(env, "todo");
+
         case DUCKDB_TYPE_VARCHAR:
-            return make_atom(env, "todo");
+            value = duckdb_value_varchar(result, col, row);
+            if(value != NULL) {
+                ERL_NIF_TERM value_binary;
+                value_binary = make_binary(env, value, strlen(value));
+                if(value_binary == atom_error) {
+                    /* [todo] handle error */
+                }
+                duckdb_free(value);
+                value = NULL;
+                return value_binary;
+            }
         case DUCKDB_TYPE_BLOB:
             return make_atom(env, "todo");
         default:
@@ -658,11 +676,7 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             if(nullmask[c]) {
                 cell = atom_null;
             } else {
-                cell = make_cell(env,
-                        duckdb_column_type(&(res->result), c),
-                        &(res->result),
-                        c, 
-                        r);
+                cell = make_cell(env, duckdb_column_type(&(res->result), c), &(res->result), c, r);
             }
             row = enif_make_list_cell(env, cell, row);
         }
