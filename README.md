@@ -4,6 +4,7 @@ DuckDB NIF for Erlang
 
 # API
 
+*Note: This is a work in progress. At the moment it is possible to open, connect, query and return integer and varchar results.*
 
 ### Startup
 
