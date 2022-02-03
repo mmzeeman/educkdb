@@ -1,6 +1,9 @@
 # educkdb
 
-DuckDB NIF for Erlang
+DuckDB NIF for Erlang. 
+
+DuckDB is an DuckDB is an in-process SQL OLAP database management system. This library makes it possible to 
+use DuckDB in Erlang, Elixir or other languages supported by the beam.
 
 # API
 
