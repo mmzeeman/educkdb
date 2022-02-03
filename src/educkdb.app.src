@@ -1,8 +1,8 @@
 {application, educkdb,
  [
-  {description, "duckdb nif interface"},
+  {description, "DuckDB NIF Interface"},
   {vsn, "0.0.1"},
-  {modules, [educkdb, educkdb_nif]},
+  {modules, [educkdb]},
   {registered, []},
   {licenses, ["Apache"]},
   {links, [{"Github", "https://github.com/mmzeeman/educkdb"}]},

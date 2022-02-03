@@ -165,7 +165,6 @@ static void
 destruct_educkdb_database(ErlNifEnv *env, void *arg)
 {
     educkdb_database *database = (educkdb_database *) arg;
-
     duckdb_close(&(database->database));
 }
  
@@ -176,7 +175,7 @@ static void
 destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
     educkdb_connection *conn = (educkdb_connection *) arg;
     educkdb_command *cmd;
-   
+
     if(conn->tid) { 
         cmd = command_create();
         if(cmd) {
@@ -258,7 +257,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
         return make_error_tuple(env, "no_iodata");
     }
 
-    result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result_type));
+    result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
     if(!result) {
         return make_error_tuple(env, "no_memory");
     }
@@ -476,6 +475,7 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     db_conn = enif_make_resource(env, conn);
     enif_release_resource(conn);
 
+
     return make_ok_tuple(env, db_conn);
 }
 
@@ -501,7 +501,7 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     /* Simply call destruct, so the thread stops and disconnect.
      * Note: this will immediately remove all commands from the queue.
      */
-    destruct_educkdb_connection(env, (void *)conn);
+    // destruct_educkdb_connection(env, (void *)conn);
 
     return atom_ok;
 }
@@ -599,7 +599,7 @@ make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, id
                 ERL_NIF_TERM value_binary;
                 value_binary = make_binary(env, value, strlen(value));
                 if(value_binary == atom_error) {
-                    /* [todo] handle error */
+                    // [todo] handle error 
                 }
                 duckdb_free(value);
                 value = NULL;
@@ -744,7 +744,6 @@ static ErlNifFunc nif_funcs[] = {
     {"query_cmd", 2, educkdb_query_cmd},
 
     {"extract_result", 1, educkdb_extract_result}
-
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);
