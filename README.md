@@ -1,5 +1,7 @@
 # educkdb
 
+[![Test](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml/badge.svg)](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml)
+
 DuckDB NIF for Erlang. 
 
 DuckDB (https://duckdb.org/) is an in-process SQL OLAP database management system. This library makes it possible to 
