@@ -55,15 +55,15 @@ query_test() ->
     {ok, Res1} = educkdb:query(Conn, "create table test(id integer, x varchar(20));"),
     {ok, Res2} = educkdb:query(Conn, "insert into test values(10, '10');"),
     {ok, Res3} = educkdb:query(Conn, "insert into test values(20, '20');"),
-    {ok, Res4} = educkdb:query(Conn, "select * from test;"),
+    {ok, _Res4} = educkdb:query(Conn, "insert into test values(null, 'null');"),
+    {ok, Res5} = educkdb:query(Conn, "select * from test order by id;"),
 
     ?assertEqual({ok, [], []}, educkdb:extract_result(Res1)),
     ?assertEqual({ok, [{column, <<"Count">>, bigint}], [[1]]}, educkdb:extract_result(Res2)),
     ?assertEqual({ok, [{column, <<"Count">>, bigint}], [[1]]}, educkdb:extract_result(Res3)),
-    ?assertEqual({ok, [{column, <<"id">>, integer}, {column, <<"x">>, varchar}],
-                  [ [10, <<"10">>],
-                    [20, <<"20">>]
-                  ]}, educkdb:extract_result(Res4)),
+    ?assertEqual({ok,
+                  [{column, <<"id">>, integer}, {column, <<"x">>, varchar}],
+                  [[null, <<"null">>], [10, <<"10">>], [20, <<"20">>]]}, educkdb:extract_result(Res5)),
 
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),

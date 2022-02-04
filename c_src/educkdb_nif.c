@@ -554,6 +554,10 @@ static ERL_NIF_TERM
 make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, idx_t row) {
     char *value;
 
+    if(duckdb_value_is_null(result, col, row)) {
+        return atom_null;
+    }
+
     switch(type) {
         case DUCKDB_TYPE_BOOLEAN:
             if(duckdb_value_boolean(result, col, row)) {
@@ -670,14 +674,8 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     for(r=row_count; r-- > 0; ) {
         row = enif_make_list(env, 0);
 
-        bool *nullmask = duckdb_nullmask_data(&(res->result), r);
-
         for(c=column_count; c-- > 0; ) {
-            if(nullmask[c]) {
-                cell = atom_null;
-            } else {
-                cell = make_cell(env, duckdb_column_type(&(res->result), c), &(res->result), c, r);
-            }
+            cell = make_cell(env, duckdb_column_type(&(res->result), c), &(res->result), c, r);
             row = enif_make_list_cell(env, cell, row);
         }
         rows = enif_make_list_cell(env, row, rows);
