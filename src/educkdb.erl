@@ -119,7 +119,7 @@ query_cmd(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%
-%% Prepated Statements 
+%% Prepared Statements 
 %%
 
 %% @doc Compile, and prepare a statement for later execution. 
@@ -132,6 +132,7 @@ prepare(_Conn, _Sql) ->
 %%
 
 %% @doc Extract the values from the result.
+-spec extract_result(result()) -> {ok, [], []}.
 extract_result(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
     

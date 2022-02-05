@@ -715,11 +715,11 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return make_error_tuple(env, "no_memory");
     }
 
-    if(duckdb_prepare(&(conn->connection), (char *) bin.data, &(prepared_statement->statement)) == DuckDBError) {
+    if(duckdb_prepare(conn->connection, (char *) bin.data, &(prepared_statement->statement)) == DuckDBError) {
         /* Don't pass errors as a prepared_statment's, but as an error tuple
          * with the error message in it. ({error, {prepare, binary()}})
          */
-        const char *error_msg = duckdb_prepare_error(&(prepared_statement->statement));
+        const char *error_msg = duckdb_prepare_error(prepared_statement->statement);
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
         enif_release_resource(prepared_statement);
 
