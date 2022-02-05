@@ -20,7 +20,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--define(DB1, ":memory:"). % "./test/dbs/temp_db1.db").
+-define(DB1, "./test/dbs/temp_db1.db").
 -define(DB2, "./test/dbs/temp_db2.db").
 
 open_single_database_test() ->
@@ -67,6 +67,29 @@ query_test() ->
 
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
+    ok.
+
+prepare_error_test() ->
+    cleanup(),
+    Query = "this is a syntax error;",
+    {ok, Db} = educkdb:open(?DB1),
+    {ok, Conn} = educkdb:connect(Db),
+    {error, {prepare, _}} = educkdb:prepare(Conn, Query),
+    ok.
+
+prepare_test() ->
+    cleanup(),
+    {ok, Db} = educkdb:open(?DB1),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(id integer, value varchar(20));"),
+    Query = "select * from test;",
+    {ok, P} = educkdb:prepare(Conn, Query),
+
+    {ok, [], []} = x(P),
+
+    educkdb:disconnect(Conn),
+    educkdb:close(Db),
+
     ok.
 
 garbage_collect_test() ->
@@ -116,4 +139,15 @@ rm_rf(Filename) ->
         {error, _} -> ok
     end.
 
+q(Conn, Query) ->
+    case educkdb:query(Conn, Query) of
+        {ok, Result} -> educkdb:extract_result(Result);
+        {error, _}=E -> E
+    end.
+
+x(Stmt) ->
+    case educkdb:execute_prepared(Stmt) of
+        {ok, Result} -> educkdb:extract_result(Result);
+        {error, _}=E -> E
+    end.
 
