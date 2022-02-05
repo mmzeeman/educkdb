@@ -74,11 +74,23 @@ prepare_error_test() ->
     Query = "this is a syntax error;",
     {ok, Db} = educkdb:open(?DB1),
     {ok, Conn} = educkdb:connect(Db),
-
     {error, {prepare, _}} = educkdb:prepare(Conn, Query),
-
     ok.
 
+prepare_test() ->
+    cleanup(),
+    {ok, Db} = educkdb:open(?DB1),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(id integer, value varchar(20));"),
+    Query = "select * from test;",
+    {ok, P} = educkdb:prepare(Conn, Query),
+
+    {ok, [], []} = x(P),
+
+    educkdb:disconnect(Conn),
+    educkdb:close(Db),
+
+    ok.
 
 garbage_collect_test() ->
     F = fun() ->
@@ -127,4 +139,15 @@ rm_rf(Filename) ->
         {error, _} -> ok
     end.
 
+q(Conn, Query) ->
+    case educkdb:query(Conn, Query) of
+        {ok, Result} -> educkdb:extract_result(Result);
+        {error, _}=E -> E
+    end.
+
+x(Stmt) ->
+    case educkdb:execute_prepared(Stmt) of
+        {ok, Result} -> educkdb:extract_result(Result);
+        {error, _}=E -> E
+    end.
 

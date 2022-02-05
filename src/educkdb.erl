@@ -29,6 +29,7 @@
     query/2,
 
     prepare/2,
+    execute_prepared/1,
 
     extract_result/1
 ]).
@@ -106,7 +107,8 @@ query(Conn, Sql) ->
     case query_cmd(Conn, Sql) of
         {ok, Ref} ->
             receive 
-                {educkdb, Ref, Answer} -> Answer
+                {educkdb, Ref, Answer} ->
+                    Answer
             end;
         {error, _}=E ->
             E
@@ -126,6 +128,21 @@ query_cmd(_Conn, _Sql) ->
 -spec prepare(connection(), sql()) -> {ok, prepared_statement()} | {error, _}.
 prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
+
+execute_prepared(PreparedStatement) ->
+    case execute_prepared_cmd(PreparedStatement) of
+        {ok, Ref} ->
+            receive 
+                {educkdb, Ref, Answer} ->
+                    Answer
+            end;
+        {error, _}=E ->
+            E
+    end.
+
+execute_prepared_cmd(_Stmt) ->
+    erlang:nif_error(nif_library_not_loaded).
+
 
 %%
 %% Results
