@@ -28,6 +28,8 @@
 
     query/2,
 
+    prepare/2,
+
     extract_result/1
 ]).
 
@@ -37,13 +39,13 @@
     query_cmd/2
 ]).
 
--type raw_database() :: reference().
--type raw_connection() :: reference().
--type raw_statement() :: reference().
--type raw_result() :: reference().
+-type database() :: reference().
+-type connection() :: reference().
+-type prepared_statement() :: reference().
+-type result() :: reference().
 -type sql() :: iodata(). 
 
--export_type([raw_connection/0, raw_statement/0, sql/0]).
+-export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0]).
 
 -on_load(init/0).
 
@@ -66,7 +68,7 @@ open(Filename) ->
 
 %% @doc Open, or create a duckdb file
 %%
-% -spec open(, map()) -> {ok, raw_database()} | {error, _}.
+% -spec open(, map()) -> {ok, database()} | {error, _}.
 open(_Filename, _Options) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -74,7 +76,7 @@ open(_Filename, _Options) ->
 %%      is used by long running commands. Note: It is adviced to use the
 %%      connection in a single process.
 %%
--spec connect(raw_database()) -> {ok, raw_connection()} | {error, _}.
+-spec connect(database()) -> {ok, connection()} | {error, _}.
 connect(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -82,12 +84,12 @@ connect(_Db) ->
 %% @doc Disconnect from the database. Stops the thread.
 %%      The calling pid will receive:
 %%      {disconnect, Ref, ok | {error, _}}.
--spec disconnect(raw_connection()) -> ok | {error, _}.
+-spec disconnect(connection()) -> ok | {error, _}.
 disconnect(_Connection) ->
     erlang:nif_error(nif_library_not_loaded).
                                  
 %% @doc Close the database. All open connections will become unusable.
--spec close(raw_database()) -> ok | {error, _}.
+-spec close(database()) -> ok | {error, _}.
 close(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
  
@@ -99,7 +101,7 @@ close(_Db) ->
 %% @doc Query the database. The answer the answer is returned immediately. 
 %% Special care has been taken to prevent blocking the scheduler. A reference
 %% to a result data structure will be returned. 
--spec query(raw_connection(), sql()) -> {ok, raw_result()} | {error, _}.
+-spec query(connection(), sql()) -> {ok, result()} | {error, _}.
 query(Conn, Sql) ->
     case query_cmd(Conn, Sql) of
         {ok, Ref} ->
@@ -112,8 +114,17 @@ query(Conn, Sql) ->
 
 %% @doc Query the database. The answer is send back as a result to 
 %% the calling process.
--spec query_cmd(raw_connection(), sql()) -> {ok, reference()} | {error, _}.
+-spec query_cmd(connection(), sql()) -> {ok, reference()} | {error, _}.
 query_cmd(_Conn, _Sql) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%%
+%% Prepated Statements 
+%%
+
+%% @doc Compile, and prepare a statement for later execution. 
+-spec prepare(connection(), sql()) -> {ok, prepared_statement()} | {error, _}.
+prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%

@@ -31,10 +31,7 @@
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
-
-/*
-static ErlNifResourceType *educkdb_statement_type = NULL;
-*/
+static ErlNifResourceType *educkdb_prepared_statement_type = NULL;
 
 /* Database reference */
 typedef struct {
@@ -52,6 +49,10 @@ typedef struct {
 typedef struct {
     duckdb_result result;
 } educkdb_result;
+
+typedef struct {
+    duckdb_prepared_statement statement;
+} educkdb_prepared_statement;
 
 typedef enum {
     cmd_unknown,
@@ -208,6 +209,21 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
     duckdb_disconnect(&(conn->connection));
 }
 
+/*
+ * Destroy a materialized result
+ */
+static void
+destruct_educkdb_result(ErlNifEnv *env, void *arg) {
+    educkdb_result *res = (educkdb_result *) arg;
+    duckdb_destroy_result(&(res->result));
+}
+
+static void
+destruct_educkdb_prepared_statement(ErlNifEnv *env, void *arg) {
+    educkdb_prepared_statement *stmt = (educkdb_prepared_statement *) arg;
+    duckdb_destroy_prepare(&(stmt->statement));
+}
+
 static const char*
 duckdb_type_name(duckdb_type t) {
     switch(t) {
@@ -233,16 +249,6 @@ duckdb_type_name(duckdb_type t) {
     }
 }
 
-/*
- * Destroy a materialized result
- */
-static void
-destruct_educkdb_result(ErlNifEnv *env, void *arg) {
-    educkdb_result *res = (educkdb_result *) arg;
-    duckdb_destroy_result(&(res->result));
-}
-
-
 static ERL_NIF_TERM
 do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
 {
@@ -251,7 +257,6 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
     educkdb_result *result;
     ERL_NIF_TERM eos = enif_make_int(env, 0);
     ERL_NIF_TERM eresult;
-    char *error_msg;
 
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin)) {
         return make_error_tuple(env, "no_iodata");
@@ -272,7 +277,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg)
         /* Don't pass errors as a result data structure, but as an error tuple
          * with the error message in it.
          */
-        error_msg = duckdb_result_error(&(result->result));
+        const char *error_msg = duckdb_result_error(&(result->result));
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
         enif_release_resource(result);
 
@@ -624,7 +629,6 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     idx_t row_count, column_count;
     const char *column_name;
     const char *column_type_name;
-    unsigned int column_name_len;
 
     ERL_NIF_TERM column_info;
     ERL_NIF_TERM column_info_tuple;
@@ -633,17 +637,15 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     ERL_NIF_TERM type_atom;
     ERL_NIF_TERM name_binary;
 
-    ErlNifBinary bin_column_name;
-
     if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
         return enif_make_badarg(env);
     }
 
-
-    /* for small number of results we can directly return the results without
+    /* For small number of results we can directly return the results without
      * rescheduling the nif.
      *
      * [TODO] find out how much cells we can handle in about 1ms.
+     * [todo] implement as yielding nif.
      */
 
     /* Column info */
@@ -684,6 +686,60 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return enif_make_tuple3(env, atom_ok, column_info, rows);
 }
 
+/*
+ * Prepared Statements.
+ */
+
+static ERL_NIF_TERM
+educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_connection *conn;
+    educkdb_prepared_statement *prepared_statement;
+    ErlNifBinary bin;
+    ERL_NIF_TERM eos = enif_make_int(env, 0);
+    ERL_NIF_TERM eprepared_statement;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
+        return enif_make_badarg(env);
+    }
+
+    prepared_statement = enif_alloc_resource(educkdb_prepared_statement_type, sizeof(educkdb_prepared_statement));
+    if(!prepared_statement) {
+        return make_error_tuple(env, "no_memory");
+    }
+
+    if(duckdb_prepare(&(conn->connection), (char *) bin.data, &(prepared_statement->statement)) == DuckDBError) {
+        /* Don't pass errors as a prepared_statment's, but as an error tuple
+         * with the error message in it. ({error, {prepare, binary()}})
+         */
+        const char *error_msg = duckdb_prepare_error(&(prepared_statement->statement));
+        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+        enif_release_resource(prepared_statement);
+
+        return enif_make_tuple2(env, atom_error,
+                enif_make_tuple2(env,
+                    make_atom(env, "prepare"), erl_error_msg));
+    
+    }
+
+    eprepared_statement = enif_make_resource(env, prepared_statement);
+    enif_release_resource(prepared_statement);
+
+    return make_ok_tuple(env, eprepared_statement);
+}
+
+static ERL_NIF_TERM
+execute_prepared(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    return make_atom(env, "todo");
+}
+ 
 
 /*
  * Load the nif. Initialize some stuff and such
@@ -691,25 +747,26 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 static int
 on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
-    educkdb_database_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_database_type", destruct_educkdb_database,
+    educkdb_database_type = enif_open_resource_type(env, "educkdb_nif",
+            "educkdb_database_type", destruct_educkdb_database,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_database_type) return -1;
 
-    educkdb_connection_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_connection_type", destruct_educkdb_connection,
+    educkdb_connection_type = enif_open_resource_type(env, "educkdb_nif",
+            "educkdb_connection_type", destruct_educkdb_connection,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_connection_type) return -1;
 
-    educkdb_result_type = enif_open_resource_type(env, "educkdb_nif", "educkdb_result", destruct_educkdb_result,
+    educkdb_result_type = enif_open_resource_type(env, "educkdb_nif",
+            "educkdb_result", destruct_educkdb_result,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_result_type) return -1;
 
 
-    /*
-    rt =  enif_open_resource_type(env, "educkdb_nif", "educkdb_statement_type", destruct_esqlite_statement,
+    educkdb_prepared_statement_type = enif_open_resource_type(env, "educkdb_nif",
+            "educkdb_prepared_statement_type", destruct_educkdb_prepared_statement,
             ERL_NIF_RT_CREATE, NULL);
-    if(!rt) return -1;
-    esqlite_statement_type = rt;
-    */
+    if(!educkdb_prepared_statement_type) return -1;
 
     atom_educkdb = make_atom(env, "educkdb");
     atom_ok = make_atom(env, "ok");
@@ -741,7 +798,10 @@ static ErlNifFunc nif_funcs[] = {
 
     {"query_cmd", 2, educkdb_query_cmd},
 
-    {"extract_result", 1, educkdb_extract_result}
+    {"extract_result", 1, educkdb_extract_result},
+
+    {"prepare", 2, educkdb_prepare}
+    // {"execute_perpared", 2, educkdb_execute_prepared},
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);
