@@ -264,7 +264,6 @@ duckdb_type_name(duckdb_type t) {
 static ERL_NIF_TERM
 do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
     ErlNifBinary bin;
-    duckdb_state rc;
     educkdb_result *result;
     ERL_NIF_TERM eos = enif_make_int(env, 0);
     ERL_NIF_TERM eresult;
@@ -282,8 +281,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
      * prevent it from hijacking the vm's scheduler for too long.
      * The result datastructure is passed back
      */
-    rc = duckdb_query(conn->connection, (char *) bin.data, &(result->result));
-    if(rc == DuckDBError) {
+    if(duckdb_query(conn->connection, (char *) bin.data, &(result->result)) == DuckDBError) {
         /* Don't pass errors as a result data structure, but as an error tuple
          * with the error message in it.
          */

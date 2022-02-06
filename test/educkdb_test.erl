@@ -86,6 +86,42 @@ prepare_test() ->
 
     ok.
 
+bind_int_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a int8, b int16, c int32, d int64);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
+
+    ok = educkdb:bind_int8(Insert, 1, 0),
+    ok = educkdb:bind_int16(Insert, 2, 0),
+    ok = educkdb:bind_int32(Insert, 3, 0),
+    ok = educkdb:bind_int64(Insert, 4, 0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [[0,0,0,0]]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
+bind_unsigned_int_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a uint8, b uint16, c uint32, d uint64);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
+
+    ok = educkdb:bind_int8(Insert, 1, 0),
+    ok = educkdb:bind_int16(Insert, 2, 0),
+    ok = educkdb:bind_int32(Insert, 3, 0),
+    ok = educkdb:bind_int64(Insert, 4, 0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [[0,0,0,0]]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
 garbage_collect_test() ->
     F = fun() ->
                 {ok, Db} = educkdb:open(":memory:"),
