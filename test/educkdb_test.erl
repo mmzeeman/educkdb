@@ -24,29 +24,25 @@
 -define(DB2, "./test/dbs/temp_db2.db").
 
 open_single_database_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     ok = educkdb:close(Db),
     ok.
 
 open_and_connect_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, _Conn} = educkdb:connect(Db),
     ok = educkdb:close(Db),
     ok.
 
 open_connect_and_disconnect_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
     ok.
 
 query_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
     {error, no_iodata} = educkdb:query(Conn, 1000),
@@ -70,16 +66,14 @@ query_test() ->
     ok.
 
 prepare_error_test() ->
-    cleanup(),
     Query = "this is a syntax error;",
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {error, {prepare, _}} = educkdb:prepare(Conn, Query),
     ok.
 
 prepare_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {ok, [], []} = q(Conn, "create table test(id integer, value varchar(20));"),
     Query = "select * from test;",
@@ -129,15 +123,15 @@ garbage_collect_test() ->
 %% Helpers
 %%
 
-cleanup() ->
-    rm_rf(?DB1),
-    rm_rf(?DB2).
-
-rm_rf(Filename) ->
-    case file:delete(Filename) of
-        ok -> ok;
-        {error, _} -> ok
-    end.
+%cleanup() ->
+%    rm_rf(?DB1),
+%    rm_rf(?DB2).
+%
+%rm_rf(Filename) ->
+%    case file:delete(Filename) of
+%        ok -> ok;
+%        {error, _} -> ok
+%    end.
 
 q(Conn, Query) ->
     case educkdb:query(Conn, Query) of

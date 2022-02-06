@@ -30,6 +30,14 @@
 
     prepare/2,
     execute_prepared/1,
+    bind_int8/3,
+    bind_int16/3,
+    bind_int32/3,
+    bind_int64/3,
+    bind_uint8/3,
+    bind_uint16/3,
+    bind_uint32/3,
+    bind_uint64/3,
 
     extract_result/1
 ]).
@@ -142,6 +150,33 @@ execute_prepared(PreparedStatement) ->
 
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
+
+
+bind_int8(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_int16(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_int32(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_int64(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_uint8(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_uint16(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_uint32(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_uint64(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+
 
 
 %%
