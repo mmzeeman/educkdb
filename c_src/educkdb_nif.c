@@ -587,12 +587,12 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
-make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, idx_t row) {
+make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
     if(duckdb_value_is_null(result, col, row)) {
         return atom_null;
     }
 
-    switch(type) {
+    switch(duckdb_column_type(result, col)) {
         case DUCKDB_TYPE_BOOLEAN:
             if(duckdb_value_boolean(result, col, row)) {
                 return atom_true;
@@ -723,7 +723,7 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         row = enif_make_list(env, 0);
 
         for(c=column_count; c-- > 0; ) {
-            cell = make_cell(env, duckdb_column_type(&(res->result), c), &(res->result), c, r);
+            cell = make_cell(env, &(res->result), c, r);
             row = enif_make_list_cell(env, cell, row);
         }
         rows = enif_make_list_cell(env, row, rows);
