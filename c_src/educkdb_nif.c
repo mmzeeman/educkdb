@@ -69,9 +69,9 @@ typedef struct {
 
     ErlNifEnv *env;
     educkdb_prepared_statement *stmt;
+    ErlNifPid pid;
     
     ERL_NIF_TERM ref;
-    ErlNifPid pid;
     ERL_NIF_TERM arg;
 } educkdb_command;
 
@@ -106,7 +106,7 @@ make_ok_tuple(ErlNifEnv *env, ERL_NIF_TERM value)
 static ERL_NIF_TERM
 make_error_tuple(ErlNifEnv *env, const char *reason)
 {
-    return enif_make_tuple2(env, atom_error, make_atom(env, reason));
+    return enif_make_tuple2(env, make_atom(env, "error"), make_atom(env, reason));
 }
 
 static ERL_NIF_TERM
@@ -145,20 +145,21 @@ command_destroy(void *obj)
 }
 
 static educkdb_command *
-command_create()
+command_create(command_type type)
 {
     educkdb_command *cmd = (educkdb_command *) enif_alloc(sizeof(educkdb_command));
     if(cmd == NULL)
         return NULL;
 
+    cmd->type = type;
     cmd->env = enif_alloc_env();
     if(cmd->env == NULL) {
         command_destroy(cmd);
         return NULL;
     }
 
-    cmd->type = cmd_unknown;
-    cmd->ref = 0;
+    cmd->ref = enif_make_ref(cmd->env);
+
     cmd->arg = 0;
     cmd->stmt = NULL;
 
@@ -184,11 +185,10 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
     educkdb_command *cmd;
 
     if(conn->tid) { 
-        cmd = command_create();
+        cmd = command_create(cmd_stop);
         if(cmd) {
             /* Send the stop command to the command thread.
             */
-            cmd->type = cmd_stop;
             queue_push(conn->commands, cmd);
 
             /* Wait for the thread to finish
@@ -349,10 +349,18 @@ evaluate_command(educkdb_command *cmd, educkdb_connection *conn) {
 
 static ERL_NIF_TERM
 push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd) {
-    if(!queue_push(conn->commands, cmd))
-        return make_error_tuple(env, "command_push_failed");
+    ERL_NIF_TERM ref;
 
-    return make_ok_tuple(env, cmd->ref);
+    if(&(cmd->pid) == NULL) {
+        return make_error_tuple(env, "no_pid");
+    }
+
+    if(!queue_push(conn->commands, cmd)) {
+        return make_error_tuple(env, "command_push");
+    }
+
+    ref = enif_make_copy(env, cmd->ref);
+    return make_ok_tuple(env, ref);
 }
 
 static ERL_NIF_TERM
@@ -367,6 +375,7 @@ educkdb_connection_run(void *arg)
     educkdb_connection *conn = (educkdb_connection *) arg;
     educkdb_command *cmd;
     int continue_running = 1;
+    ErlNifEnv *env = enif_alloc_env();
 
     while(continue_running) {
         cmd = queue_pop(conn->commands);
@@ -374,12 +383,15 @@ educkdb_connection_run(void *arg)
         if(cmd->type == cmd_stop) {
             continue_running = 0;
         } else {
-            enif_send(NULL, &cmd->pid, cmd->env, make_answer(cmd, evaluate_command(cmd, conn)));
+            ERL_NIF_TERM response = evaluate_command(cmd, conn);
+            ERL_NIF_TERM answer = enif_make_tuple3(cmd->env, atom_educkdb, cmd->ref, response);
+            enif_send(env, &(cmd->pid), cmd->env, answer); 
         }
 
         command_destroy(cmd);
     }
 
+    enif_free_env(env);
     return NULL;
 }
 
@@ -554,7 +566,6 @@ static ERL_NIF_TERM
 educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_connection *conn;
     educkdb_command *cmd = NULL;
-    ERL_NIF_TERM ref;
 
     if(argc != 2) {
         return enif_make_badarg(env);
@@ -564,16 +575,13 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    cmd = command_create();
+    cmd = command_create(cmd_query);
     if(!cmd) {
         return make_error_tuple(env, "command_create");
     }
 
-    cmd->type = cmd_query;
-    ref = enif_make_ref(env);
-    cmd->ref = enif_make_copy(cmd->env, ref);
-    enif_self(env, &(cmd->pid));
     cmd->arg = enif_make_copy(cmd->env, argv[1]);
+    enif_self(env, &(cmd->pid));
 
     return push_command(env, conn, cmd);
 }
@@ -782,19 +790,15 @@ educkdb_execute_prepared_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
         return enif_make_badarg(env);
     }
 
-    cmd = command_create();
+    cmd = command_create(cmd_execute_prepared);
     if(!cmd) {
         return make_error_tuple(env, "command_create");
     }
 
-    cmd->type = cmd_execute_prepared;
-    ref = enif_make_ref(env);
-    cmd->ref = enif_make_copy(cmd->env, ref);
-    enif_self(env, &(cmd->pid));
-
     /* Make sure the reference to the statement is kept */
     cmd->stmt = stmt;
     enif_keep_resource(stmt);
+    enif_self(env, &(cmd->pid));
 
     return push_command(env, stmt->connection, cmd);
 }
