@@ -588,8 +588,6 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
 static ERL_NIF_TERM
 make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, idx_t row) {
-    char *value;
-
     if(duckdb_value_is_null(result, col, row)) {
         return atom_null;
     }
@@ -600,22 +598,37 @@ make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, id
                 return atom_true;
             } else {
                 return atom_false;
-            }
+            };
         case DUCKDB_TYPE_TINYINT:
         case DUCKDB_TYPE_SMALLINT:
         case DUCKDB_TYPE_INTEGER:
-            return enif_make_int(env, duckdb_value_int32(result, col, row));
+            {
+                int32_t value = duckdb_value_int32(result, col, row);
+                return enif_make_int(env, value);
+            }
         case DUCKDB_TYPE_BIGINT:
-            return enif_make_int64(env, duckdb_value_int64(result, col, row));
+            {
+                int64_t value = duckdb_value_int64(result, col, row);
+                return enif_make_int64(env, value);
+            }
         case DUCKDB_TYPE_UTINYINT:
         case DUCKDB_TYPE_USMALLINT:
         case DUCKDB_TYPE_UINTEGER:
-            return enif_make_uint(env, duckdb_value_uint32(result, col, row));
+            {
+                uint32_t value = duckdb_value_uint32(result, col, row);
+                return enif_make_uint(env, value);
+            }
         case DUCKDB_TYPE_UBIGINT:
-            return enif_make_uint64(env, duckdb_value_uint64(result, col, row));
+            {
+                uint64_t value = duckdb_value_uint64(result, col, row);
+                return enif_make_uint64(env, value);
+            }
         case DUCKDB_TYPE_FLOAT:
         case DUCKDB_TYPE_DOUBLE:
-            return enif_make_double(env, duckdb_value_double(result, col, row));
+            {
+                double value = duckdb_value_double(result, col, row);
+                return enif_make_double(env, value);
+            }
         case DUCKDB_TYPE_TIMESTAMP:
             return make_atom(env, "todo");
 
@@ -634,16 +647,18 @@ make_cell(ErlNifEnv *env, duckdb_type type, duckdb_result *result, idx_t col, id
             return make_atom(env, "todo");
 
         case DUCKDB_TYPE_VARCHAR:
-            value = duckdb_value_varchar(result, col, row);
-            if(value != NULL) {
-                ERL_NIF_TERM value_binary;
-                value_binary = make_binary(env, value, strlen(value));
-                if(value_binary == atom_error) {
-                    // [todo] handle error 
+            {
+                char *value = duckdb_value_varchar(result, col, row);
+                if(value != NULL) {
+                    ERL_NIF_TERM value_binary;
+                    value_binary = make_binary(env, value, strlen(value));
+                    if(value_binary == atom_error) {
+                        // [todo] handle error 
+                    }
+                    duckdb_free(value);
+                    value = NULL;
+                    return value_binary;
                 }
-                duckdb_free(value);
-                value = NULL;
-                return value_binary;
             }
         case DUCKDB_TYPE_BLOB:
             return make_atom(env, "todo");

@@ -90,7 +90,7 @@ bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, [], []} = q(Conn, "create table test(a int8, b int16, c int32, d int64);"),
+    {ok, [], []} = q(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
     ok = educkdb:bind_int8(Insert, 1, 0),
@@ -142,7 +142,7 @@ bind_unsigned_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, [], []} = q(Conn, "create table test(a uint8, b uint16, c uint32, d uint64);"),
+    {ok, [], []} = q(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
     ok = educkdb:bind_uint8(Insert, 1, 0),
@@ -171,9 +171,33 @@ bind_unsigned_int_test() ->
              [128,32768,2147483648,9223372036854775808],
              [255, 65535, 4294967295, 18446744073709551615]
             ]} = q(Conn, "select * from test order by a"),
+    ok.
+
+bind_float_and_double_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_float(Insert, 1, 0.0),
+    ok = educkdb:bind_double(Insert, 2, 0.0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_float(Insert, 1,  200000000000000000000000.0),
+    ok = educkdb:bind_double(Insert, 2, 200000000000000000000000.0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [0.0, 0.0],
+             [1.9999999556392617e23, 2.0e23]
+            ]} = q(Conn, "select * from test order by a"),
 
     ok.
 
+ 
 garbage_collect_test() ->
     F = fun() ->
                 {ok, Db} = educkdb:open(":memory:"),
