@@ -100,7 +100,41 @@ bind_int_test() ->
 
     {ok, _, [[1]]} = x(Insert),
 
-    {ok, _, [[0,0,0,0]]} = q(Conn, "select * from test order by a"),
+    ok = educkdb:bind_int8(Insert, 1, 3),
+    ok = educkdb:bind_int16(Insert, 2, 3),
+    ok = educkdb:bind_int32(Insert, 3, 3),
+    ok = educkdb:bind_int64(Insert, 4, 3),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, -3),
+    ok = educkdb:bind_int16(Insert, 2, -3),
+    ok = educkdb:bind_int32(Insert, 3, -3),
+    ok = educkdb:bind_int64(Insert, 4, -3),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, 127),
+    ok = educkdb:bind_int16(Insert, 2, 32767),
+    ok = educkdb:bind_int32(Insert, 3, 2147483647),
+    ok = educkdb:bind_int64(Insert, 4, 9223372036854775807),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, -127),
+    ok = educkdb:bind_int16(Insert, 2, -32767),
+    ok = educkdb:bind_int32(Insert, 3, -2147483647),
+    ok = educkdb:bind_int64(Insert, 4, -9223372036854775807),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [-127, -32767, -2147483647, -9223372036854775807],
+             [-3,-3,-3,-3],
+             [0,0,0,0],
+             [3,3,3,3],
+             [127, 32767, 2147483647, 9223372036854775807]
+            ]} = q(Conn, "select * from test order by a"),
 
     ok.
 
@@ -111,14 +145,26 @@ bind_unsigned_int_test() ->
     {ok, [], []} = q(Conn, "create table test(a uint8, b uint16, c uint32, d uint64);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
-    ok = educkdb:bind_int8(Insert, 1, 0),
-    ok = educkdb:bind_int16(Insert, 2, 0),
-    ok = educkdb:bind_int32(Insert, 3, 0),
-    ok = educkdb:bind_int64(Insert, 4, 0),
+    ok = educkdb:bind_uint8(Insert, 1, 0),
+    ok = educkdb:bind_uint16(Insert, 2, 0),
+    ok = educkdb:bind_uint32(Insert, 3, 0),
+    ok = educkdb:bind_uint64(Insert, 4, 0),
 
     {ok, _, [[1]]} = x(Insert),
 
-    {ok, _, [[0,0,0,0]]} = q(Conn, "select * from test order by a"),
+    % ok = educkdb:bind_uint8(Insert, 1, 128),
+    % ok = educkdb:bind_uint16(Insert, 2, 32768),
+    % ok = educkdb:bind_uint32(Insert, 3, 2147483648),
+    % ok = educkdb:bind_uint64(Insert, 4, 9223372036854775808),
+    
+    % {ok, _, [[1]]} = x(Insert),
+
+
+    {ok, _, [
+             [0,0,0,0]
+             %,
+             %[128,32768,2147483648,9223372036854775808]
+            ]} = q(Conn, "select * from test order by a"),
 
     ok.
 
