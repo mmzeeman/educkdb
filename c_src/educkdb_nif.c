@@ -808,6 +808,7 @@ educkdb_bind_int8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     ErlNifUInt64 index;
     int value;
+    int8_t bind_value;
 
     if(argc != 3) {
         return enif_make_badarg(env);
@@ -825,7 +826,13 @@ educkdb_bind_int8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     } 
 
-    if(duckdb_bind_int8(stmt->statement, (idx_t) index, (int8_t) value) == DuckDBError) {
+    if(value > INT8_MAX || value < INT8_MIN) {
+        return enif_make_badarg(env);
+    }
+
+    bind_value = value;
+
+    if(duckdb_bind_int8(stmt->statement, (idx_t) index, bind_value) == DuckDBError) {
         return atom_error;
     }
 
@@ -837,6 +844,7 @@ educkdb_bind_int16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     ErlNifUInt64 index;
     int value;
+    int16_t bind_value;
 
     if(argc != 3) {
         return enif_make_badarg(env);
@@ -854,7 +862,13 @@ educkdb_bind_int16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     } 
 
-    if(duckdb_bind_int16(stmt->statement, (idx_t) index, (int16_t) value) == DuckDBError) {
+    if(value > INT16_MAX || value < INT16_MIN) {
+        return enif_make_badarg(env);
+    }
+
+    bind_value = value;
+
+    if(duckdb_bind_int16(stmt->statement, (idx_t) index, bind_value) == DuckDBError) {
         return atom_error;
     }
 
