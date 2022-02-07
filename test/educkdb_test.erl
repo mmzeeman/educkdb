@@ -152,18 +152,24 @@ bind_unsigned_int_test() ->
 
     {ok, _, [[1]]} = x(Insert),
 
-    % ok = educkdb:bind_uint8(Insert, 1, 128),
-    % ok = educkdb:bind_uint16(Insert, 2, 32768),
-    % ok = educkdb:bind_uint32(Insert, 3, 2147483648),
-    % ok = educkdb:bind_uint64(Insert, 4, 9223372036854775808),
+    ok = educkdb:bind_uint8(Insert, 1, 128),
+    ok = educkdb:bind_uint16(Insert, 2, 32768),
+    ok = educkdb:bind_uint32(Insert, 3, 2147483648),
+    ok = educkdb:bind_uint64(Insert, 4, 9223372036854775808),
     
-    % {ok, _, [[1]]} = x(Insert),
+    {ok, _, [[1]]} = x(Insert),
 
+    ok = educkdb:bind_uint8(Insert, 1, 255),
+    ok = educkdb:bind_uint16(Insert, 2, 65535),
+    ok = educkdb:bind_uint32(Insert, 3, 4294967295),
+    ok = educkdb:bind_uint64(Insert, 4, 18446744073709551615),
+
+    {ok, _, [[1]]} = x(Insert),
 
     {ok, _, [
-             [0,0,0,0]
-             %,
-             %[128,32768,2147483648,9223372036854775808]
+             [0,0,0,0],
+             [128,32768,2147483648,9223372036854775808],
+             [255, 65535, 4294967295, 18446744073709551615]
             ]} = q(Conn, "select * from test order by a"),
 
     ok.
