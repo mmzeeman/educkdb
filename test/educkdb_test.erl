@@ -233,6 +233,22 @@ bind_null_test() ->
 
     ok.
 
+bind_boolean_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a boolean, b boolean);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_boolean(Insert, 1, true),
+    ok = educkdb:bind_boolean(Insert, 2, false),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [true, false]
+            ]} = q(Conn, "select * from test order by a"),
+    ok.
 
  
 garbage_collect_test() ->
