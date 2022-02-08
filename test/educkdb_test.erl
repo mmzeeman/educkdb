@@ -215,6 +215,25 @@ bind_float_and_double_test() ->
 
     ok.
 
+bind_null_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_null(Insert,  1),
+    ok = educkdb:bind_null(Insert,  2),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [null, null]
+            ]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
+
  
 garbage_collect_test() ->
     F = fun() ->
