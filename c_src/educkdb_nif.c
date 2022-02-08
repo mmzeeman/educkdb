@@ -1138,6 +1138,30 @@ educkdb_bind_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return atom_ok;
 }
 
+static ERL_NIF_TERM
+educkdb_bind_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+    
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_bind_null(stmt->statement, (idx_t) index) == DuckDBError) {
+        return atom_error;
+    }
+
+    return atom_ok;
+}
+
 
 
 /*
@@ -1209,7 +1233,8 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_uint32", 3, educkdb_bind_uint32},
     {"bind_uint64", 3, educkdb_bind_uint64},
     {"bind_float", 3, educkdb_bind_float},
-    {"bind_double", 3, educkdb_bind_double}
+    {"bind_double", 3, educkdb_bind_double},
+    {"bind_null", 2, educkdb_bind_null}
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);

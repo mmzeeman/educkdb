@@ -40,6 +40,7 @@
     bind_uint64/3,
     bind_float/3,
     bind_double/3,
+    bind_null/2,
 
     extract_result/1
 ]).
@@ -184,7 +185,8 @@ bind_float(_Stmt, _Index, _Value) ->
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
-
+bind_null(_Stmt, _Index) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 
 %%
