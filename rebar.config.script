@@ -32,7 +32,6 @@ CXXFlags =
             CFlagsOverride
     end.
 
-
 [
     {minimum_otp_vsn, "21.0"},
 

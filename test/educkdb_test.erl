@@ -23,30 +23,43 @@
 -define(DB1, "./test/dbs/temp_db1.db").
 -define(DB2, "./test/dbs/temp_db2.db").
 
+
+-define(INT8_MIN, -127).
+-define(INT8_MAX,  127).
+-define(UINT8_MAX, 255).
+
+-define(INT16_MIN, -32767).
+-define(INT16_MAX,  32767).
+-define(UINT16_MAX, 65535).
+
+-define(INT32_MIN, -2147483647).
+-define(INT32_MAX,  2147483647).
+-define(UINT32_MAX, 4294967295).
+
+-define(INT64_MIN,  -9223372036854775807).
+-define(INT64_MAX,   9223372036854775807).
+-define(UINT64_MAX, 18446744073709551615).
+
 open_single_database_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     ok = educkdb:close(Db),
     ok.
 
 open_and_connect_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, _Conn} = educkdb:connect(Db),
     ok = educkdb:close(Db),
     ok.
 
 open_connect_and_disconnect_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
     ok.
 
 query_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
     {error, no_iodata} = educkdb:query(Conn, 1000),
@@ -70,16 +83,14 @@ query_test() ->
     ok.
 
 prepare_error_test() ->
-    cleanup(),
     Query = "this is a syntax error;",
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {error, {prepare, _}} = educkdb:prepare(Conn, Query),
     ok.
 
 prepare_test() ->
-    cleanup(),
-    {ok, Db} = educkdb:open(?DB1),
+    {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {ok, [], []} = q(Conn, "create table test(id integer, value varchar(20));"),
     Query = "select * from test;",
@@ -92,6 +103,119 @@ prepare_test() ->
 
     ok.
 
+bind_int_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
+    {ok, [], []} = q(Conn, "select * from test;"),
+
+    ok = educkdb:bind_int8(Insert, 1, 0),
+    ok = educkdb:bind_int16(Insert, 2, 0),
+    ok = educkdb:bind_int32(Insert, 3, 0),
+    ok = educkdb:bind_int64(Insert, 4, 0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, 3),
+    ok = educkdb:bind_int16(Insert, 2, 3),
+    ok = educkdb:bind_int32(Insert, 3, 3),
+    ok = educkdb:bind_int64(Insert, 4, 3),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, -3),
+    ok = educkdb:bind_int16(Insert, 2, -3),
+    ok = educkdb:bind_int32(Insert, 3, -3),
+    ok = educkdb:bind_int64(Insert, 4, -3),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, ?INT8_MAX),
+    ok = educkdb:bind_int16(Insert, 2, ?INT16_MAX),
+    ok = educkdb:bind_int32(Insert, 3, ?INT32_MAX),
+    ok = educkdb:bind_int64(Insert, 4, ?INT64_MAX),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_int8(Insert, 1, ?INT8_MIN),
+    ok = educkdb:bind_int16(Insert, 2, ?INT16_MIN),
+    ok = educkdb:bind_int32(Insert, 3, ?INT32_MIN),
+    ok = educkdb:bind_int64(Insert, 4, ?INT64_MIN),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [?INT8_MIN, ?INT16_MIN, ?INT32_MIN, ?INT64_MIN],
+             [-3,-3,-3,-3],
+             [0,0,0,0],
+             [3,3,3,3],
+             [?INT8_MAX, ?INT16_MAX, ?INT32_MAX, ?INT64_MAX]
+            ]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
+bind_unsigned_int_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
+
+    ok = educkdb:bind_uint8(Insert,  1, 0),
+    ok = educkdb:bind_uint16(Insert, 2, 0),
+    ok = educkdb:bind_uint32(Insert, 3, 0),
+    ok = educkdb:bind_uint64(Insert, 4, 0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_uint8(Insert,  1,  ?INT8_MAX),
+    ok = educkdb:bind_uint16(Insert, 2, ?INT16_MAX),
+    ok = educkdb:bind_uint32(Insert, 3, ?INT32_MAX),
+    ok = educkdb:bind_uint64(Insert, 4, ?INT64_MAX),
+    
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_uint8(Insert,  1,  ?UINT8_MAX),
+    ok = educkdb:bind_uint16(Insert, 2, ?UINT16_MAX),
+    ok = educkdb:bind_uint32(Insert, 3, ?UINT32_MAX),
+    ok = educkdb:bind_uint64(Insert, 4, ?UINT64_MAX),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [0,0,0,0],
+             [ ?INT8_MAX,  ?INT16_MAX,  ?INT32_MAX,  ?INT64_MAX],
+             [?UINT8_MAX, ?UINT16_MAX, ?UINT32_MAX, ?UINT64_MAX]
+            ]} = q(Conn, "select * from test order by a"),
+    ok.
+
+bind_float_and_double_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_float(Insert, 1, 0.0),
+    ok = educkdb:bind_double(Insert, 2, 0.0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_float(Insert, 1,  200000000000000000000000.0),
+    ok = educkdb:bind_double(Insert, 2, 200000000000000000000000.0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [0.0, 0.0],
+             [1.9999999556392617e23, 2.0e23]
+            ]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
+ 
 garbage_collect_test() ->
     F = fun() ->
                 {ok, Db} = educkdb:open(":memory:"),
@@ -129,15 +253,15 @@ garbage_collect_test() ->
 %% Helpers
 %%
 
-cleanup() ->
-    rm_rf(?DB1),
-    rm_rf(?DB2).
-
-rm_rf(Filename) ->
-    case file:delete(Filename) of
-        ok -> ok;
-        {error, _} -> ok
-    end.
+%cleanup() ->
+%    rm_rf(?DB1),
+%    rm_rf(?DB2).
+%
+%rm_rf(Filename) ->
+%    case file:delete(Filename) of
+%        ok -> ok;
+%        {error, _} -> ok
+%    end.
 
 q(Conn, Query) ->
     case educkdb:query(Conn, Query) of
