@@ -41,6 +41,7 @@
     bind_uint64/3,
     bind_float/3,
     bind_double/3,
+    bind_varchar/3,
     bind_null/2,
 
     extract_result/1
@@ -191,6 +192,11 @@ bind_float(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
 bind_double(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+% @doc Bind a iolist as varchar. 
+% Note: be really carefull, value must be valid utf8 data.
+bind_varchar(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
 bind_null(_Stmt, _Index) ->

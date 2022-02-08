@@ -248,6 +248,31 @@ bind_boolean_test() ->
     {ok, _, [
              [true, false]
             ]} = q(Conn, "select * from test order by a"),
+
+    ok.
+
+    
+bind_varchar_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = q(Conn, "create table test(a varchar(10), b varchar(200));"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_varchar(Insert, 1, "hello"),
+    ok = educkdb:bind_varchar(Insert, 2, "world"),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_varchar(Insert, 1, <<"😀"/utf8>>),
+    ok = educkdb:bind_varchar(Insert, 2, <<0, "()">>),
+
+    % {ok, _, [[1]]} = x(Insert),
+
+    {ok, _, [
+             [<<"hello">>, <<"world">>],
+             [<<"😀"/utf8>>, <<"1234567890">>]
+            ]} = q(Conn, "select * from test order by a"),
     ok.
 
  
