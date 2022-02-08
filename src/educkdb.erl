@@ -30,6 +30,7 @@
 
     prepare/2,
     execute_prepared/1,
+    bind_boolean/3,
     bind_int8/3,
     bind_int16/3,
     bind_int32/3,
@@ -154,6 +155,13 @@ execute_prepared(PreparedStatement) ->
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
 
+bind_boolean(Statement, Index, true) ->
+    bind_boolean_intern(Statement, Index, 1);
+bind_boolean(Statement, Index, false) ->
+    bind_boolean_intern(Statement, Index, 0).
+
+bind_boolean_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 bind_int8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
