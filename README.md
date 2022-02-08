@@ -57,6 +57,9 @@ Note: **via command thread**
 
 Note: **direct c**
 
+#### `bind_null(Stmt, Index, Value)`
+Note: **direct c**
+
 #### `bind_boolean(Stmt, Index, Value)`
 Note: **direct c**
 
@@ -104,7 +107,7 @@ Note: **direct c**
 
 #### `....more`
 
-#### `execute(Stmt)`
+#### `execute_statement(Stmt)`
 
 Note: **via command thread**
 
