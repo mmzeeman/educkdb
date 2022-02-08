@@ -55,6 +55,7 @@ typedef struct {
     duckdb_result result;
 } educkdb_result;
 
+
 typedef enum {
     cmd_unknown,
 
@@ -521,7 +522,6 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     db_conn = enif_make_resource(env, conn);
     enif_release_resource(conn);
 
-
     return make_ok_tuple(env, db_conn);
 }
 
@@ -624,6 +624,7 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
                 return enif_make_uint64(env, value);
             }
         case DUCKDB_TYPE_FLOAT:
+            // Erlang does not have floats, fall through to double.
         case DUCKDB_TYPE_DOUBLE:
             {
                 double value = duckdb_value_double(result, col, row);
@@ -639,9 +640,7 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
             return make_atom(env, "todo");
 
         case DUCKDB_TYPE_INTERVAL:
-            
             return make_atom(env, "todo");
-
         case DUCKDB_TYPE_HUGEINT:
             // record with two 64 bit integers
             return make_atom(env, "todo");
@@ -717,6 +716,7 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             column_info = enif_make_list_cell(env, column_info_tuple, column_info);
         }
     }
+    
     /* Rows */
     rows = enif_make_list(env, 0);
     for(r=row_count; r-- > 0; ) {
@@ -783,7 +783,7 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 /*
- * execute_perpated_cmd
+ * execute_prepared_cmd
  *
  * Check the input values, and put the command on the queue to make
  * sure queries are handled in one calling thread. Queries can also
