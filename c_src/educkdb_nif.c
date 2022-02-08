@@ -246,8 +246,8 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_SMALLINT:  return "smallint";
         case DUCKDB_TYPE_INTEGER:   return "integer";
         case DUCKDB_TYPE_BIGINT:    return "bigint";
-        case DUCKDB_TYPE_UTINYINT:  return "tinyint";
-        case DUCKDB_TYPE_USMALLINT: return "smallint";
+        case DUCKDB_TYPE_UTINYINT:  return "utinyint";
+        case DUCKDB_TYPE_USMALLINT: return "usmallint";
         case DUCKDB_TYPE_UINTEGER:  return "uinteger";
         case DUCKDB_TYPE_UBIGINT:   return "ubigint";
         case DUCKDB_TYPE_FLOAT:     return "float";
@@ -1075,11 +1075,6 @@ educkdb_bind_uint64(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(duckdb_bind_uint64(stmt->statement, (idx_t) index, value) == DuckDBError) {
         return atom_error;
     }
-
-    if(duckdb_bind_double(stmt->statement, (idx_t) index, value) == DuckDBError) {
-        return atom_error;
-    }
-
 
     return atom_ok;
 }

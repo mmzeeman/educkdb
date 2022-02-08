@@ -23,6 +23,23 @@
 -define(DB1, "./test/dbs/temp_db1.db").
 -define(DB2, "./test/dbs/temp_db2.db").
 
+
+-define(INT8_MIN, -127).
+-define(INT8_MAX,  127).
+-define(UINT8_MAX, 255).
+
+-define(INT16_MIN, -32767).
+-define(INT16_MAX,  32767).
+-define(UINT16_MAX, 65535).
+
+-define(INT32_MIN, -2147483647).
+-define(INT32_MAX,  2147483647).
+-define(UINT32_MAX, 4294967295).
+
+-define(INT64_MIN,  -9223372036854775807).
+-define(INT64_MAX,   9223372036854775807).
+-define(UINT64_MAX, 18446744073709551615).
+
 open_single_database_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     ok = educkdb:close(Db),
@@ -92,6 +109,7 @@ bind_int_test() ->
 
     {ok, [], []} = q(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
+    {ok, [], []} = q(Conn, "select * from test;"),
 
     ok = educkdb:bind_int8(Insert, 1, 0),
     ok = educkdb:bind_int16(Insert, 2, 0),
@@ -114,26 +132,26 @@ bind_int_test() ->
 
     {ok, _, [[1]]} = x(Insert),
 
-    ok = educkdb:bind_int8(Insert, 1, 127),
-    ok = educkdb:bind_int16(Insert, 2, 32767),
-    ok = educkdb:bind_int32(Insert, 3, 2147483647),
-    ok = educkdb:bind_int64(Insert, 4, 9223372036854775807),
+    ok = educkdb:bind_int8(Insert, 1, ?INT8_MAX),
+    ok = educkdb:bind_int16(Insert, 2, ?INT16_MAX),
+    ok = educkdb:bind_int32(Insert, 3, ?INT32_MAX),
+    ok = educkdb:bind_int64(Insert, 4, ?INT64_MAX),
 
     {ok, _, [[1]]} = x(Insert),
 
-    ok = educkdb:bind_int8(Insert, 1, -127),
-    ok = educkdb:bind_int16(Insert, 2, -32767),
-    ok = educkdb:bind_int32(Insert, 3, -2147483647),
-    ok = educkdb:bind_int64(Insert, 4, -9223372036854775807),
+    ok = educkdb:bind_int8(Insert, 1, ?INT8_MIN),
+    ok = educkdb:bind_int16(Insert, 2, ?INT16_MIN),
+    ok = educkdb:bind_int32(Insert, 3, ?INT32_MIN),
+    ok = educkdb:bind_int64(Insert, 4, ?INT64_MIN),
 
     {ok, _, [[1]]} = x(Insert),
 
     {ok, _, [
-             [-127, -32767, -2147483647, -9223372036854775807],
+             [?INT8_MIN, ?INT16_MIN, ?INT32_MIN, ?INT64_MIN],
              [-3,-3,-3,-3],
              [0,0,0,0],
              [3,3,3,3],
-             [127, 32767, 2147483647, 9223372036854775807]
+             [?INT8_MAX, ?INT16_MAX, ?INT32_MAX, ?INT64_MAX]
             ]} = q(Conn, "select * from test order by a"),
 
     ok.
@@ -145,31 +163,31 @@ bind_unsigned_int_test() ->
     {ok, [], []} = q(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
-    ok = educkdb:bind_uint8(Insert, 1, 0),
+    ok = educkdb:bind_uint8(Insert,  1, 0),
     ok = educkdb:bind_uint16(Insert, 2, 0),
     ok = educkdb:bind_uint32(Insert, 3, 0),
     ok = educkdb:bind_uint64(Insert, 4, 0),
 
     {ok, _, [[1]]} = x(Insert),
 
-    ok = educkdb:bind_uint8(Insert, 1, 128),
-    ok = educkdb:bind_uint16(Insert, 2, 32768),
-    ok = educkdb:bind_uint32(Insert, 3, 2147483648),
-    ok = educkdb:bind_uint64(Insert, 4, 9223372036854775808),
+    ok = educkdb:bind_uint8(Insert,  1,  ?INT8_MAX),
+    ok = educkdb:bind_uint16(Insert, 2, ?INT16_MAX),
+    ok = educkdb:bind_uint32(Insert, 3, ?INT32_MAX),
+    ok = educkdb:bind_uint64(Insert, 4, ?INT64_MAX),
     
     {ok, _, [[1]]} = x(Insert),
 
-    ok = educkdb:bind_uint8(Insert, 1, 255),
-    ok = educkdb:bind_uint16(Insert, 2, 65535),
-    ok = educkdb:bind_uint32(Insert, 3, 4294967295),
-    ok = educkdb:bind_uint64(Insert, 4, 18446744073709551615-1),
+    ok = educkdb:bind_uint8(Insert,  1,  ?UINT8_MAX),
+    ok = educkdb:bind_uint16(Insert, 2, ?UINT16_MAX),
+    ok = educkdb:bind_uint32(Insert, 3, ?UINT32_MAX),
+    ok = educkdb:bind_uint64(Insert, 4, ?UINT64_MAX),
 
     {ok, _, [[1]]} = x(Insert),
 
     {ok, _, [
              [0,0,0,0],
-             [128,32768,2147483648,9223372036854775808],
-             [255, 65535, 4294967295, 18446744073709551615-1]
+             [ ?INT8_MAX,  ?INT16_MAX,  ?INT32_MAX,  ?INT64_MAX],
+             [?UINT8_MAX, ?UINT16_MAX, ?UINT32_MAX, ?UINT64_MAX]
             ]} = q(Conn, "select * from test order by a"),
     ok.
 
