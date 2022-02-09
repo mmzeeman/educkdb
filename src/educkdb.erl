@@ -65,7 +65,7 @@
 
 init() ->
     NifName = "educkdb_nif",
-    NifFileName = case code:priv_dir(esqlite) of
+    NifFileName = case code:priv_dir(educkdb) of
                       {error, bad_name} -> filename:join("priv", NifName);
                       Dir -> filename:join(Dir, NifName)
                   end,
