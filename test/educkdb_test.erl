@@ -265,14 +265,17 @@ bind_varchar_test() ->
     {ok, _, [[1]]} = x(Insert),
 
     ok = educkdb:bind_varchar(Insert, 1, <<"😀"/utf8>>),
-    ok = educkdb:bind_varchar(Insert, 2, <<0, "()">>),
+    ok = educkdb:bind_varchar(Insert, 2, <<"1234567890">>),
 
-    % {ok, _, [[1]]} = x(Insert),
+     {ok, _, [[1]]} = x(Insert),
 
-    {ok, _, [
-             [<<"hello">>, <<"world">>],
-             [<<"😀"/utf8>>, <<"1234567890">>]
-            ]} = q(Conn, "select * from test order by a"),
+    {ok, [ {column,<<"a">>,varchar},
+           {column,<<"b">>,varchar}
+         ],
+     [ [<<"hello">>, <<"world">>],
+       [<<"😀"/utf8>>, <<"1234567890">>]
+     ]
+    } = q(Conn, "select * from test order by a"),
     ok.
 
  
