@@ -278,6 +278,21 @@ bind_varchar_test() ->
     } = q(Conn, "select * from test order by a"),
     ok.
 
+appender_create_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {error, {appender, "Catalog Error: Table \"main.test\" could not be found"}} = educkdb:appender_create(Conn, undefined, <<"test">>),
+    {error, {appender, "Catalog Error: Table \"x.test\" could not be found"}} = educkdb:appender_create(Conn, <<"x">>, <<"test">>),
+
+    {ok, [], []} = q(Conn, "create table test(a varchar(10), b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    Appender,
+
+    ok.
+
  
 garbage_collect_test() ->
     F = fun() ->

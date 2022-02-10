@@ -777,6 +777,7 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(!prepared_statement) {
         return make_error_tuple(env, "no_memory");
     }
+    prepared_statement->connection = NULL;
 
     if(duckdb_prepare(conn->connection, (char *) bin.data, &(prepared_statement->statement)) == DuckDBError) {
         /* Don't pass errors as a prepared_statment's, but as an error tuple
@@ -1242,9 +1243,10 @@ static ERL_NIF_TERM
 educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_connection *conn;
     educkdb_appender *appender;
-
-    ErlNifBinary scheme;
-    ErlNifBinary table;
+    char atom_scheme[10];
+    const char *scheme = NULL;
+    ErlNifBinary scheme_bin;
+    ErlNifBinary table_bin;
     ERL_NIF_TERM eos = enif_make_int(env, 0);
 
     ERL_NIF_TERM eappender;
@@ -1257,11 +1259,19 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &scheme)) {
+    if(enif_get_atom(env, argv[1], atom_scheme, sizeof(atom_scheme), ERL_NIF_LATIN1)) {
+        if(strncmp(atom_scheme, "undefined", sizeof(atom_scheme)) == 0) {
+            scheme = NULL;
+        } else {
+            return enif_make_badarg(env);
+        }
+    } else if(enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &scheme_bin)) {
+        scheme = scheme_bin.data;
+    } else {
         return enif_make_badarg(env);
     }
 
-    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &table)) {
+    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[2], eos), &table_bin)) {
         return enif_make_badarg(env);
     }
 
@@ -1269,8 +1279,9 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(!appender) {
         return make_error_tuple(env, "no_memory");
     }
+    appender->connection = NULL;
 
-    if(duckdb_appender_create(conn->connection, (const char *) scheme.data, (const char *) table.data, &(appender->appender)) == DuckDBError) {
+    if(duckdb_appender_create(conn->connection, scheme, (const char *) table_bin.data, &(appender->appender)) == DuckDBError) {
         /* Don't pass errors as a prepared_statment's, but as an error tuple
          * with the error message in it. ({error, {prepare, binary()}})
          */
