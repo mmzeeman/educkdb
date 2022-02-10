@@ -44,7 +44,9 @@
     bind_varchar/3,
     bind_null/2,
 
-    extract_result/1
+    extract_result/1,
+
+    appender_create/3
 ]).
 
 %% low-level api
@@ -57,6 +59,7 @@
 -type connection() :: reference().
 -type prepared_statement() :: reference().
 -type result() :: reference().
+-type appender() :: reference().
 -type sql() :: iodata(). 
 
 -export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0]).
@@ -213,3 +216,10 @@ extract_result(_Result) ->
     erlang:nif_error(nif_library_not_loaded).
     
 
+%%
+%% Appender Interface
+%%
+
+-spec appender_create(connection(), string(), string()) -> {ok, appender()} | {error, _}. 
+appender_create(_Connection, _Schema, _Table) -> 
+    erlang:nif_error(nif_library_not_loaded).
