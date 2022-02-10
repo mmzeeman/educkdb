@@ -57,57 +57,57 @@ Note: **via command thread**
 
 Note: **direct c**
 
-#### `bind_null(Stmt, Index, Value)`
+#### `bind_null(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_boolean(Stmt, Index, Value)`
+#### `bind_boolean(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_int8(Stmt, Index, Value)`
+#### `bind_int8(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_int16(Stmt, Index, Value)`
+#### `bind_int16(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_int32(Stmt, Index, Value)`
+#### `bind_int32(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_int64(Stmt, Index, Value)`
+#### `bind_int64(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_hugeint(Stmt, Index, Value)`
+#### `bind_hugeint(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_uint8(Stmt, Index, Value)`
+#### `bind_uint8(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_uint16(Stmt, Index, Value)`
+#### `bind_uint16(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_uint32(Stmt, Index, Value)`
+#### `bind_uint32(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_uint64(Stmt, Index, Value)`
+#### `bind_uint64(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_float(Stmt, Index, Value)`
+#### `bind_float(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_double(Stmt, Index, Value)`
+#### `bind_double(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_date(Stmt, Index, Value)`
+#### `bind_date(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_time(Stmt, Index, Value)`
+#### `bind_time(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
-#### `bind_timestamp(Stmt, Index, Value)`
+#### `bind_timestamp(Stmt, Index, Value)` -> `ok` | `error`
 Note: **direct c**
 
 #### `....more`
 
-#### `execute_statement(Stmt)`
+#### `execute_statement(Stmt)` -> `{ok, result()}` | `{error, _}`
 
 Note: **via command thread**
 
