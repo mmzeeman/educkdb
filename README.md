@@ -7,6 +7,16 @@ DuckDB NIF for Erlang.
 DuckDB (https://duckdb.org/) is an in-process SQL OLAP database management system. This library makes it possible to 
 use DuckDB in Erlang, Elixir or other languages supported by the beam.
 
+# Example
+
+```erlang
+
+{ok, Db} = educkdb:open("database.db"),
+{ok, Conn} = educkdb:connect(Db)
+...
+
+```
+
 # API
 
 *Note: This is a work in progress. At the moment it is possible to open, connect, query and return integer and
