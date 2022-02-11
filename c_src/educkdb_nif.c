@@ -1302,6 +1302,32 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     make_ok_tuple(env, eappender);
 }
 
+static ERL_NIF_TERM
+educkdb_appender_end_row(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_appender_end_row(&(appender->appender)) == DuckDBError) {
+        const char *error_msg = duckdb_appender_error(appender->appender);
+        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+        enif_release_resource(appender);
+
+        return enif_make_tuple2(env, atom_error,
+                enif_make_tuple2(env,
+                    make_atom(env, "appender"), erl_error_msg));
+
+    }
+
+    return atom_ok;
+}
+    
 
 /*
  * Load the nif. Initialize some stuff and such
@@ -1382,7 +1408,8 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_varchar", 3, educkdb_bind_varchar},
     {"bind_null", 2, educkdb_bind_null},
 
-    {"appender_create", 3, educkdb_appender_create}
+    {"appender_create", 3, educkdb_appender_create},
+    {"appender_end_row", 1, educkdb_appender_end_row}
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);

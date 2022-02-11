@@ -46,7 +46,8 @@
 
     extract_result/1,
 
-    appender_create/3
+    appender_create/3,
+    appender_end_row/1
 ]).
 
 %% low-level api
@@ -223,3 +224,9 @@ extract_result(_Result) ->
 -spec appender_create(connection(), string(), string()) -> {ok, appender()} | {error, _}. 
 appender_create(_Connection, _Schema, _Table) -> 
     erlang:nif_error(nif_library_not_loaded).
+
+
+-spec appender_end_row(appender()) -> ok | {error, _}.
+appender_end_row(_Appender) ->
+    erlang:nif_error(nif_library_not_loaded).
+
