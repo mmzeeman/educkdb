@@ -293,7 +293,6 @@ appender_create_test() ->
 
     ok.
 
-
 appender_end_row_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -306,6 +305,30 @@ appender_end_row_test() ->
 
     ok.
 
+appender_append_int32_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a integer, b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_int32(Appender, 1),
+    ok = educkdb:append_int32(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender), % [note] normally you don't have to call this.
+
+    {ok,[{column,<<"a">>,integer},{column,<<"b">>,integer}],
+     [[1,2]]} = q(Conn, "select * from test;"),
+
+    ok = educkdb:append_int32(Appender, 3),
+    ok = educkdb:append_int32(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+
+    {ok,[{column,<<"a">>,integer},{column,<<"b">>,integer}],
+     [[1,2],[3,4]]} = q(Conn, "select * from test;"),
+
+    ok.
 
 
  

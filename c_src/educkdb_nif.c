@@ -305,7 +305,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
         /* Don't pass errors as a result data structure, but as an error tuple
          * with the error message in it.
          */
-        const char *error_msg = duckdb_result_error(&(result->result));
+        const char *error_msg = duckdb_result_error(&(result->result)); 
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
         enif_release_resource(result);
 
@@ -1239,13 +1239,27 @@ educkdb_bind_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return atom_ok;
 }
 
+/*
+ * Appender
+ */
+
+static ERL_NIF_TERM
+get_appender_error(ErlNifEnv *env, duckdb_appender appender) {
+    const char *error_msg = duckdb_appender_error(appender);
+    ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+
+    return enif_make_tuple2(env, atom_error,
+            enif_make_tuple2(env,
+                make_atom(env, "appender"), erl_error_msg));
+}
+ 
 static ERL_NIF_TERM
 educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_connection *conn;
     educkdb_appender *appender;
-    char atom_scheme[10];
-    const char *scheme = NULL;
-    ErlNifBinary scheme_bin;
+    char atom_schema[10];
+    const char *schema = NULL;
+    ErlNifBinary schema_bin;
     ErlNifBinary table_bin;
     ERL_NIF_TERM eos = enif_make_int(env, 0);
 
@@ -1259,14 +1273,14 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    if(enif_get_atom(env, argv[1], atom_scheme, sizeof(atom_scheme), ERL_NIF_LATIN1)) {
-        if(strncmp(atom_scheme, "undefined", sizeof(atom_scheme)) == 0) {
-            scheme = NULL;
+    if(enif_get_atom(env, argv[1], atom_schema, sizeof(atom_schema), ERL_NIF_LATIN1)) {
+        if(strncmp(atom_schema, "undefined", sizeof(atom_schema)) == 0) {
+            schema = NULL;
         } else {
             return enif_make_badarg(env);
         }
-    } else if(enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &scheme_bin)) {
-        scheme = scheme_bin.data;
+    } else if(enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &schema_bin)) {
+        schema = (const char *) schema_bin.data;
     } else {
         return enif_make_badarg(env);
     }
@@ -1281,17 +1295,14 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     }
     appender->connection = NULL;
 
-    if(duckdb_appender_create(conn->connection, scheme, (const char *) table_bin.data, &(appender->appender)) == DuckDBError) {
+    if(duckdb_appender_create(conn->connection, schema, (const char *) table_bin.data, &(appender->appender)) == DuckDBError) {
         /* Don't pass errors as a prepared_statment's, but as an error tuple
          * with the error message in it. ({error, {prepare, binary()}})
          */
-        const char *error_msg = duckdb_appender_error(appender->appender);
-        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+        ERL_NIF_TERM error = get_appender_error(env, appender->appender);
         enif_release_resource(appender);
 
-        return enif_make_tuple2(env, atom_error,
-                enif_make_tuple2(env,
-                    make_atom(env, "appender"), erl_error_msg));
+        return error;
     }
 
     enif_keep_resource(conn);
@@ -1299,7 +1310,50 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     eappender = enif_make_resource(env, appender);
     enif_release_resource(appender);
 
-    make_ok_tuple(env, eappender);
+    return make_ok_tuple(env, eappender);
+}
+
+static ERL_NIF_TERM
+educkdb_append_int32(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    int value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_int32(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_appender_flush(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_appender_flush(appender->appender) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
 }
 
 static ERL_NIF_TERM
@@ -1315,17 +1369,13 @@ educkdb_appender_end_row(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     }
 
     if(duckdb_appender_end_row(appender->appender) == DuckDBError) {
-        const char *error_msg = duckdb_appender_error(appender->appender);
-        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
-
-        return enif_make_tuple2(env, atom_error,
-                enif_make_tuple2(env,
-                    make_atom(env, "appender"), erl_error_msg));
+        return get_appender_error(env, appender->appender);
     }
 
     return atom_ok;
 }
-    
+
+   
 
 /*
  * Load the nif. Initialize some stuff and such
@@ -1407,6 +1457,9 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_null", 2, educkdb_bind_null},
 
     {"appender_create", 3, educkdb_appender_create},
+    {"append_int32", 2, educkdb_append_int32},
+
+    {"appender_flush", 1, educkdb_appender_flush, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"appender_end_row", 1, educkdb_appender_end_row}
 };
 
