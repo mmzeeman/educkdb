@@ -1314,15 +1314,13 @@ educkdb_appender_end_row(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    if(duckdb_appender_end_row(&(appender->appender)) == DuckDBError) {
+    if(duckdb_appender_end_row(appender->appender) == DuckDBError) {
         const char *error_msg = duckdb_appender_error(appender->appender);
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
-        enif_release_resource(appender);
 
         return enif_make_tuple2(env, atom_error,
                 enif_make_tuple2(env,
                     make_atom(env, "appender"), erl_error_msg));
-
     }
 
     return atom_ok;

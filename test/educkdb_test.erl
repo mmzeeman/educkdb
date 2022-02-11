@@ -293,6 +293,21 @@ appender_create_test() ->
 
     ok.
 
+
+appender_end_row_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a varchar(10), b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    {error, {appender, "Invalid Input Error: Call to EndRow before all rows have been appended to!"}}
+        =  educkdb:appender_end_row(Appender),
+
+    ok.
+
+
+
  
 garbage_collect_test() ->
     F = fun() ->
