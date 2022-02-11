@@ -9,13 +9,24 @@ use DuckDB in Erlang, Elixir or other languages supported by the beam.
 
 # Example
 
+Connect to a database
+
 ```erlang
 
 {ok, Db} = educkdb:open("database.db"),
 {ok, Conn} = educkdb:connect(Db)
 ...
-
 ```
+
+Create a table by reading a CSV or parquet files.
+
+```erlang
+
+{ok, _} = educkdb:query(Conn, "CREATE TABLE ontime AS SELECT * FROM 'test.csv'"),
+{ok, ParquetData} = educkdb:query(Conn, "SELECT * FROM 'test.parquet'"),
+...
+```
+
 
 # API
 
