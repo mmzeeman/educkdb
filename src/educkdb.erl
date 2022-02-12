@@ -47,7 +47,11 @@
     extract_result/1,
 
     appender_create/3,
+    append_int8/2,
+    append_int16/2,
     append_int32/2,
+    append_int64/2,
+
     appender_flush/1,
     appender_end_row/1
 ]).
@@ -227,8 +231,20 @@ extract_result(_Result) ->
 appender_create(_Connection, _Schema, _Table) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec append_int8(appender(), integer()) -> ok | {error, _}.
+append_int8(_Appender, _Integer) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec append_int16(appender(), integer()) -> ok | {error, _}.
+append_int16(_Appender, _Integer) ->
+    erlang:nif_error(nif_library_not_loaded).
+
 -spec append_int32(appender(), integer()) -> ok | {error, _}.
 append_int32(_Appender, _Integer) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec append_int64(appender(), integer()) -> ok | {error, _}.
+append_int64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec appender_flush(appender()) -> ok | {error, _}.
