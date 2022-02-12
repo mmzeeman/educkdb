@@ -55,6 +55,8 @@
     append_uint16/2,
     append_uint32/2,
     append_uint64/2,
+    append_float/2,
+    append_double/2,
 
     append_null/1,
     appender_flush/1,
@@ -268,6 +270,13 @@ append_uint32(_Appender, _Integer) ->
 append_uint64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
+-spec append_float(appender(), integer()) -> ok | {error, _}.
+append_float(_Appender, _Integer) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec append_double(appender(), integer()) -> ok | {error, _}.
+append_double(_Appender, _Integer) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 -spec append_null(appender()) -> ok | {error, _}.
 append_null(_Appender) ->
