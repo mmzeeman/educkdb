@@ -28,6 +28,8 @@
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
+#define NIF_NAME "educkdb_nif"
+
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
@@ -1601,22 +1603,22 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_database_type) return -1;
 
-    educkdb_connection_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_connection_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_connection_type", destruct_educkdb_connection,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_connection_type) return -1;
 
-    educkdb_result_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_result_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_result", destruct_educkdb_result,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_result_type) return -1;
 
-    educkdb_prepared_statement_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_prepared_statement_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_prepared_statement_type", destruct_educkdb_prepared_statement,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_prepared_statement_type) return -1;
 
-    educkdb_appender_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_appender_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_appender_type", destruct_educkdb_appender,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_appender_type) return -1;
