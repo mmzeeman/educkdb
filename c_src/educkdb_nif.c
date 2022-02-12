@@ -1424,6 +1424,25 @@ educkdb_append_int64(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_append_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_append_null(appender->appender) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
 educkdb_appender_flush(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_appender *appender;
 
@@ -1559,9 +1578,11 @@ static ErlNifFunc nif_funcs[] = {
     {"append_double", 2, educkdb_append_double},
 
     {"append_varchar", 2, educkdb_append_varchar},
-    {"append_null", 1, educkdb_append_null},
 
     */
+
+    {"append_null", 1, educkdb_append_null},
+
 
     {"appender_flush", 1, educkdb_appender_flush, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"appender_end_row", 1, educkdb_appender_end_row}
