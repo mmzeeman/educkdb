@@ -478,7 +478,6 @@ appender_append_uint16_test() ->
  
     {ok,[{column, <<"a">>, usmallint}, {column, <<"b">>, usmallint}],
      [[0, ?UINT16_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
-
     ok.
 
 appender_append_uint8_test() ->
@@ -503,10 +502,7 @@ appender_append_uint8_test() ->
  
     {ok,[{column, <<"a">>, utinyint}, {column, <<"b">>, utinyint}],
      [[0, ?UINT8_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
-
     ok.
-
-
  
 garbage_collect_test() ->
     F = fun() ->

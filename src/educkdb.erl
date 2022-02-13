@@ -57,7 +57,7 @@
     append_uint64/2,
     append_float/2,
     append_double/2,
-
+    append_varchar/2,
     append_null/1,
     appender_flush/1,
     appender_end_row/1
@@ -74,9 +74,31 @@
 -type prepared_statement() :: reference().
 -type result() :: reference().
 -type appender() :: reference().
+
 -type sql() :: iodata(). 
 
--export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0]).
+-type idx() :: 0..16#FF_FF_FF_FF_FF_FF_FF_FF. 
+
+-type int8() :: -16#7F..16#7F.
+-type uint8() :: 0..16#FF.
+
+-type int16() :: -16#7FFF..16#7F_FF.
+-type uint16() :: 0..16#FFFF.
+
+-type int32() :: -16#7F_FF_FF_FF..16#7F_FF_FF_FF.
+-type uint32() :: 0..16#FF_FF_FF_FF.
+
+-type int64() :: -16#FF_FF_FF_FF_FF_FF_FF_FF..16#FF_FF_FF_FF_FF_FF_FF_FF.
+-type uint64() :: 0..16#FF_FF_FF_FF_FF_FF_FF_FF. 
+
+-type bind_response() :: ok | {error, _}.
+-type append_response() :: ok | {error, _}.
+
+-export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0,
+              int8/0, int16/0, int32/0, int64/0,
+              uint8/0, uint16/0, uint32/0, uint64/0,
+              idx/0
+             ]).
 
 -on_load(init/0).
 
@@ -170,52 +192,67 @@ execute_prepared(PreparedStatement) ->
             E
     end.
 
+-spec execute_prepared_cmd(prepared_statement()) -> bind_response().
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_boolean(prepared_statement(), idx(), boolean()) -> bind_response().
 bind_boolean(Statement, Index, true) ->
     bind_boolean_intern(Statement, Index, 1);
 bind_boolean(Statement, Index, false) ->
     bind_boolean_intern(Statement, Index, 0).
 
+-spec bind_boolean_intern(prepared_statement(), idx(), 0..1) -> bind_response().
 bind_boolean_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_int8(prepared_statement(), idx(), int8()) -> bind_response().
 bind_int8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_int16(prepared_statement(), idx(), int16()) -> bind_response().
 bind_int16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_int32(prepared_statement(), idx(), int32()) -> bind_response().
 bind_int32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_int64(prepared_statement(), idx(), int64()) -> bind_response().
 bind_int64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_uint8(prepared_statement(), idx(), uint8()) -> bind_response().
 bind_uint8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_uint16(prepared_statement(), idx(), uint16()) -> bind_response().
 bind_uint16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_uint32(prepared_statement(), idx(), uint32()) -> bind_response().
 bind_uint32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_uint64(prepared_statement(), idx(), uint64()) -> bind_response().
 bind_uint64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_float(prepared_statement(), idx(), float()) -> bind_response().
 bind_float(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_double(prepared_statement(), idx(), float()) -> bind_response().
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
 % @doc Bind a iolist as varchar. 
 % Note: be really carefull, value must be valid utf8 data.
+-spec bind_varchar(prepared_statement(), idx(), iodata()) -> bind_response().
 bind_varchar(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec bind_null(prepared_statement(), idx()) -> bind_response().
 bind_null(_Stmt, _Index) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -238,55 +275,60 @@ extract_result(_Result) ->
 appender_create(_Connection, _Schema, _Table) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int8(appender(), integer()) -> ok | {error, _}.
+-spec append_int8(appender(), int8()) -> append_response().
 append_int8(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int16(appender(), integer()) -> ok | {error, _}.
+-spec append_int16(appender(), int16()) -> append_response().
 append_int16(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int32(appender(), integer()) -> ok | {error, _}.
+-spec append_int32(appender(), int32()) -> append_response().
 append_int32(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int64(appender(), integer()) -> ok | {error, _}.
+-spec append_int64(appender(), integer()) -> append_response().
 append_int64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint8(appender(), integer()) -> ok | {error, _}.
+-spec append_uint8(appender(), uint8()) -> append_response().
 append_uint8(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint16(appender(), integer()) -> ok | {error, _}.
+-spec append_uint16(appender(), uint16()) -> append_response().
 append_uint16(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint32(appender(), integer()) -> ok | {error, _}.
+-spec append_uint32(appender(), uint32()) -> append_response().
 append_uint32(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint64(appender(), integer()) -> ok | {error, _}.
+-spec append_uint64(appender(), uint64()) -> append_response().
 append_uint64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_float(appender(), integer()) -> ok | {error, _}.
+-spec append_float(appender(), float()) -> append_response().
 append_float(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_double(appender(), integer()) -> ok | {error, _}.
+-spec append_double(appender(), float()) -> append_response().
 append_double(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_null(appender()) -> ok | {error, _}.
+-spec append_varchar(appender(), iodata()) -> append_response().
+append_varchar(_Appender, _IOData) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+
+-spec append_null(appender()) -> append_response().
 append_null(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec appender_flush(appender()) -> ok | {error, _}.
+-spec appender_flush(appender()) -> append_response().
 appender_flush(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec appender_end_row(appender()) -> ok | {error, _}.
+-spec appender_end_row(appender()) -> append_response().
 appender_end_row(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
 

@@ -1587,6 +1587,30 @@ educkdb_append_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_append_varchar(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    ErlNifBinary binary;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_inspect_iolist_as_binary(env, argv[2], &binary)) {
+        return make_error_tuple(env, "no_iodata");
+    }
+
+    if(duckdb_append_varchar_length(appender->appender, (const char *) binary.data, binary.size) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
 educkdb_append_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_appender *appender;
 
@@ -1731,17 +1755,10 @@ static ErlNifFunc nif_funcs[] = {
     {"append_uint16", 2, educkdb_append_uint16},
     {"append_uint32", 2, educkdb_append_uint32},
     {"append_uint64", 2, educkdb_append_uint64},
-
     {"append_float", 2, educkdb_append_float},
     {"append_double", 2, educkdb_append_double},
-
-    /*
     {"append_varchar", 2, educkdb_append_varchar},
-
-    */
-
     {"append_null", 1, educkdb_append_null},
-
 
     {"appender_flush", 1, educkdb_appender_flush, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"appender_end_row", 1, educkdb_appender_end_row}
