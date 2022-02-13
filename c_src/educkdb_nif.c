@@ -1459,7 +1459,7 @@ educkdb_append_uint8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 static ERL_NIF_TERM
 educkdb_append_uint16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_appender *appender;
-    uint value;
+    unsigned int value;
     uint16_t append_value;
 
     if(argc != 2) {
