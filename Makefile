@@ -18,7 +18,7 @@ compile: $(REBAR3)
 	$(REBAR3) compile
 
 test: compile
-	$(REBAR3) eunit
+	$(REBAR3) eunit -v
 
 clean: $(REBAR3)
 	$(REBAR3) clean

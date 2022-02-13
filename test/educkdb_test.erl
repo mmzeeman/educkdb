@@ -278,6 +278,231 @@ bind_varchar_test() ->
     } = q(Conn, "select * from test order by a"),
     ok.
 
+appender_create_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {error, {appender, "Catalog Error: Table \"main.test\" could not be found"}} = educkdb:appender_create(Conn, undefined, <<"test">>),
+    {error, {appender, "Catalog Error: Table \"x.test\" could not be found"}} = educkdb:appender_create(Conn, <<"x">>, <<"test">>),
+
+    {ok, [], []} = q(Conn, "create table test(a varchar(10), b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    Appender,
+
+    ok.
+
+appender_end_row_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a varchar(10), b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    {error, {appender, "Invalid Input Error: Call to EndRow before all rows have been appended to!"}}
+        =  educkdb:appender_end_row(Appender),
+
+    ok.
+
+appender_append_int64_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a bigint, b bigint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_int64(Appender, 1),
+    ok = educkdb:append_int64(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int64(Appender, 3),
+    ok = educkdb:append_int64(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int64(Appender, ?INT64_MIN),
+    ok = educkdb:append_int64(Appender, ?INT64_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, bigint},{column, <<"b">>, bigint}],
+     [[?INT64_MIN, ?INT64_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+
+appender_append_int32_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a integer, b integer);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_int32(Appender, 1),
+    ok = educkdb:append_int32(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int32(Appender, 3),
+    ok = educkdb:append_int32(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int32(Appender, ?INT32_MIN),
+    ok = educkdb:append_int32(Appender, ?INT32_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, integer},{column, <<"b">>, integer}],
+     [[?INT32_MIN, ?INT32_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_int16_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a smallint, b smallint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_int16(Appender, 1),
+    ok = educkdb:append_int16(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int16(Appender, 3),
+    ok = educkdb:append_int16(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int16(Appender, ?INT16_MIN),
+    ok = educkdb:append_int16(Appender, ?INT16_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, smallint},{column, <<"b">>, smallint}],
+     [[?INT16_MIN, ?INT16_MAX], [1,2], [3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_int8_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a tinyint, b tinyint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_int8(Appender, 1),
+    ok = educkdb:append_int8(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int8(Appender, 3),
+    ok = educkdb:append_int8(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_int8(Appender, ?INT8_MIN),
+    ok = educkdb:append_int8(Appender, ?INT8_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, tinyint},{column, <<"b">>, tinyint}],
+     [[?INT8_MIN, ?INT8_MAX], [1,2], [3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_uint64_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a ubigint, b ubigint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_uint64(Appender, 1),
+    ok = educkdb:append_uint64(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint64(Appender, 3),
+    ok = educkdb:append_uint64(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint64(Appender, 0),
+    ok = educkdb:append_uint64(Appender, ?UINT64_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, ubigint},{column, <<"b">>, ubigint}],
+     [[0, ?UINT64_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_uint32_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a uinteger, b uinteger);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_uint32(Appender, 1),
+    ok = educkdb:append_uint32(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint32(Appender, 3),
+    ok = educkdb:append_uint32(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint32(Appender, 0),
+    ok = educkdb:append_uint32(Appender, ?UINT32_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, uinteger}, {column, <<"b">>, uinteger}],
+     [[0, ?UINT32_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_uint16_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a usmallint, b usmallint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_uint16(Appender, 1),
+    ok = educkdb:append_uint16(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint16(Appender, 3),
+    ok = educkdb:append_uint16(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint16(Appender, 0),
+    ok = educkdb:append_uint16(Appender, ?UINT16_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, usmallint}, {column, <<"b">>, usmallint}],
+     [[0, ?UINT16_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+    ok.
+
+appender_append_uint8_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a utinyint, b utinyint);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_uint8(Appender, 1),
+    ok = educkdb:append_uint8(Appender, 2),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint8(Appender, 3),
+    ok = educkdb:append_uint8(Appender, 4),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_uint8(Appender, 0),
+    ok = educkdb:append_uint8(Appender, ?UINT8_MAX),
+    ok = educkdb:appender_end_row(Appender),
+    ok = educkdb:appender_flush(Appender),
+ 
+    {ok,[{column, <<"a">>, utinyint}, {column, <<"b">>, utinyint}],
+     [[0, ?UINT8_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
+    ok.
  
 garbage_collect_test() ->
     F = fun() ->

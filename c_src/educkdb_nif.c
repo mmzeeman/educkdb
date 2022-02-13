@@ -28,10 +28,13 @@
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
+#define NIF_NAME "educkdb_nif"
+
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
 static ErlNifResourceType *educkdb_prepared_statement_type = NULL;
+static ErlNifResourceType *educkdb_appender_type = NULL;
 
 /* Database reference */
 typedef struct {
@@ -54,6 +57,11 @@ typedef struct {
 typedef struct {
     duckdb_result result;
 } educkdb_result;
+
+typedef struct {
+    educkdb_connection *connection;
+    duckdb_appender appender;
+} educkdb_appender;
 
 
 typedef enum {
@@ -237,6 +245,19 @@ destruct_educkdb_prepared_statement(ErlNifEnv *env, void *arg) {
     duckdb_destroy_prepare(&(stmt->statement));
 }
 
+static void
+destruct_educkdb_appender(ErlNifEnv *env, void *arg) {
+    educkdb_appender *appender = (educkdb_appender *) arg;
+
+    if(appender->connection) {
+        enif_release_resource(appender->connection);
+        appender->connection = NULL;
+    }
+
+    /* Does a flush close and destroy */
+    duckdb_appender_destroy(&(appender->appender));
+}
+
 static const char*
 duckdb_type_name(duckdb_type t) {
     switch(t) {
@@ -286,7 +307,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
         /* Don't pass errors as a result data structure, but as an error tuple
          * with the error message in it.
          */
-        const char *error_msg = duckdb_result_error(&(result->result));
+        const char *error_msg = duckdb_result_error(&(result->result)); 
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
         enif_release_resource(result);
 
@@ -303,7 +324,6 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
 
 static ERL_NIF_TERM
 do_execute_prepared(ErlNifEnv *env, educkdb_prepared_statement *stmt, const ERL_NIF_TERM arg) {
-    duckdb_state rc;
     educkdb_result *result;
     ERL_NIF_TERM eresult;
 
@@ -312,8 +332,7 @@ do_execute_prepared(ErlNifEnv *env, educkdb_prepared_statement *stmt, const ERL_
         return make_error_tuple(env, "no_memory");
     }
 
-    rc = duckdb_execute_prepared(stmt->statement, &(result->result));
-    if(rc == DuckDBError) {
+    if(duckdb_execute_prepared(stmt->statement, &(result->result)) == DuckDBError) {
         /* Don't pass errors as a result data structure, but as an error tuple
          * with the error message in it.
          */
@@ -760,6 +779,7 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(!prepared_statement) {
         return make_error_tuple(env, "no_memory");
     }
+    prepared_statement->connection = NULL;
 
     if(duckdb_prepare(conn->connection, (char *) bin.data, &(prepared_statement->statement)) == DuckDBError) {
         /* Don't pass errors as a prepared_statment's, but as an error tuple
@@ -795,7 +815,6 @@ static ERL_NIF_TERM
 educkdb_execute_prepared_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     educkdb_command *cmd = NULL;
-    ERL_NIF_TERM ref;
  
     if(argc != 1) {
         return enif_make_badarg(env);
@@ -1045,7 +1064,7 @@ educkdb_bind_uint16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     bind_value = (uint16_t) value;
 
-    if(duckdb_bind_uint16(stmt->statement, (idx_t) index, value) == DuckDBError) {
+    if(duckdb_bind_uint16(stmt->statement, (idx_t) index, bind_value) == DuckDBError) {
         return atom_error;
     }
 
@@ -1191,7 +1210,7 @@ educkdb_bind_varchar(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return make_error_tuple(env, "no_iodata");
     }
 
-    if(duckdb_bind_varchar_length(stmt->statement, (idx_t) index, binary.data, binary.size) == DuckDBError) {
+    if(duckdb_bind_varchar_length(stmt->statement, (idx_t) index, (const char *)binary.data, binary.size) == DuckDBError) {
         return atom_error;
     }
 
@@ -1222,7 +1241,431 @@ educkdb_bind_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return atom_ok;
 }
 
+/*
+ * Appender
+ */
 
+static ERL_NIF_TERM
+get_appender_error(ErlNifEnv *env, duckdb_appender appender) {
+    const char *error_msg = duckdb_appender_error(appender);
+    ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+
+    return enif_make_tuple2(env, atom_error,
+            enif_make_tuple2(env,
+                make_atom(env, "appender"), erl_error_msg));
+}
+ 
+static ERL_NIF_TERM
+educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_connection *conn;
+    educkdb_appender *appender;
+    char atom_schema[10];
+    const char *schema = NULL;
+    ErlNifBinary schema_bin;
+    ErlNifBinary table_bin;
+    ERL_NIF_TERM eos = enif_make_int(env, 0);
+
+    ERL_NIF_TERM eappender;
+
+    if(argc != 3) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
+        return enif_make_badarg(env);
+    }
+
+    if(enif_get_atom(env, argv[1], atom_schema, sizeof(atom_schema), ERL_NIF_LATIN1)) {
+        if(strncmp(atom_schema, "undefined", sizeof(atom_schema)) == 0) {
+            schema = NULL;
+        } else {
+            return enif_make_badarg(env);
+        }
+    } else if(enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &schema_bin)) {
+        schema = (const char *) schema_bin.data;
+    } else {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[2], eos), &table_bin)) {
+        return enif_make_badarg(env);
+    }
+
+    appender = enif_alloc_resource(educkdb_appender_type, sizeof(educkdb_appender));
+    if(!appender) {
+        return make_error_tuple(env, "no_memory");
+    }
+    appender->connection = NULL;
+
+    if(duckdb_appender_create(conn->connection, schema, (const char *) table_bin.data, &(appender->appender)) == DuckDBError) {
+        /* Don't pass errors as a prepared_statment's, but as an error tuple
+         * with the error message in it. ({error, {prepare, binary()}})
+         */
+        ERL_NIF_TERM error = get_appender_error(env, appender->appender);
+        enif_release_resource(appender);
+
+        return error;
+    }
+
+    enif_keep_resource(conn);
+    appender->connection = conn;
+    eappender = enif_make_resource(env, appender);
+    enif_release_resource(appender);
+
+    return make_ok_tuple(env, eappender);
+}
+
+static ERL_NIF_TERM
+educkdb_append_int8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    int value;
+    int8_t append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(value > INT8_MAX || value < INT8_MIN) {
+        return enif_make_badarg(env);
+    }
+
+    append_value = (int8_t) value;
+
+    if(duckdb_append_int8(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_int16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    int value;
+    int16_t append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(value > INT16_MAX || value < INT16_MIN) {
+        return enif_make_badarg(env);
+    }
+
+    append_value = (int16_t) value;
+
+    if(duckdb_append_int16(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_int32(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    int value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_int32(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_int64(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    ErlNifSInt64 value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int64(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_int64(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_uint8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    unsigned int value;
+    uint8_t append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(value > UINT8_MAX) {
+        return enif_make_badarg(env);
+    }
+
+    append_value = (uint8_t) value;
+
+    if(duckdb_append_uint8(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_uint16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    unsigned int value;
+    uint16_t append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(value > UINT16_MAX) {
+        return enif_make_badarg(env);
+    }
+
+    append_value = (uint16_t) value;
+
+    if(duckdb_append_uint16(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_uint32(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    unsigned int value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_uint32(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_uint64(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    ErlNifUInt64 value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint64(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_uint64(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_float(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    double value;
+    float append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_double(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    append_value = (float) value;
+
+    if(duckdb_append_float(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    double value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_double(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(duckdb_append_double(appender->appender, value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_varchar(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    ErlNifBinary binary;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_inspect_iolist_as_binary(env, argv[2], &binary)) {
+        return make_error_tuple(env, "no_iodata");
+    }
+
+    if(duckdb_append_varchar_length(appender->appender, (const char *) binary.data, binary.size) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_append_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_append_null(appender->appender) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_appender_flush(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_appender_flush(appender->appender) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_appender_end_row(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(duckdb_appender_end_row(appender->appender) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
 
 /*
  * Load the nif. Initialize some stuff and such
@@ -1235,20 +1678,25 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_database_type) return -1;
 
-    educkdb_connection_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_connection_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_connection_type", destruct_educkdb_connection,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_connection_type) return -1;
 
-    educkdb_result_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_result_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_result", destruct_educkdb_result,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_result_type) return -1;
 
-    educkdb_prepared_statement_type = enif_open_resource_type(env, "educkdb_nif",
+    educkdb_prepared_statement_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_prepared_statement_type", destruct_educkdb_prepared_statement,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_prepared_statement_type) return -1;
+
+    educkdb_appender_type = enif_open_resource_type(env, NIF_NAME,
+            "educkdb_appender_type", destruct_educkdb_appender,
+            ERL_NIF_RT_CREATE, NULL);
+    if(!educkdb_appender_type) return -1;
 
     atom_educkdb = make_atom(env, "educkdb");
     atom_ok = make_atom(env, "ok");
@@ -1296,7 +1744,23 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_float", 3, educkdb_bind_float},
     {"bind_double", 3, educkdb_bind_double},
     {"bind_varchar", 3, educkdb_bind_varchar},
-    {"bind_null", 2, educkdb_bind_null}
+    {"bind_null", 2, educkdb_bind_null},
+
+    {"appender_create", 3, educkdb_appender_create},
+    {"append_int8", 2, educkdb_append_int8},
+    {"append_int16", 2, educkdb_append_int16},
+    {"append_int32", 2, educkdb_append_int32},
+    {"append_int64", 2, educkdb_append_int64},
+    {"append_uint8", 2, educkdb_append_uint8},
+    {"append_uint16", 2, educkdb_append_uint16},
+    {"append_uint32", 2, educkdb_append_uint32},
+    {"append_uint64", 2, educkdb_append_uint64},
+    {"append_float", 2, educkdb_append_float},
+    {"append_double", 2, educkdb_append_double},
+    {"append_varchar", 2, educkdb_append_varchar},
+    {"append_null", 1, educkdb_append_null},
+    {"appender_flush", 1, educkdb_appender_flush, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"appender_end_row", 1, educkdb_appender_end_row}
 };
 
 ERL_NIF_INIT(educkdb, nif_funcs, on_load, on_reload, on_upgrade, NULL);
