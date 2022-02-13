@@ -77,19 +77,19 @@
 
 -type sql() :: iodata(). 
 
--type idx() :: 0..16#FF_FF_FF_FF_FF_FF_FF_FF. 
+-type idx() :: 0..16#FFFFFFFFFFFFFFFF. 
 
 -type int8() :: -16#7F..16#7F.
 -type uint8() :: 0..16#FF.
 
--type int16() :: -16#7FFF..16#7F_FF.
+-type int16() :: -16#7FFF..16#7FFF.
 -type uint16() :: 0..16#FFFF.
 
--type int32() :: -16#7F_FF_FF_FF..16#7F_FF_FF_FF.
--type uint32() :: 0..16#FF_FF_FF_FF.
+-type int32() :: -16#7FFFFFFF..16#7FFFFFFF.
+-type uint32() :: 0..16#FFFFFFFF.
 
--type int64() :: -16#FF_FF_FF_FF_FF_FF_FF_FF..16#FF_FF_FF_FF_FF_FF_FF_FF.
--type uint64() :: 0..16#FF_FF_FF_FF_FF_FF_FF_FF. 
+-type int64() :: -16#7FFFFFFFFFFFFFFF..16#7FFFFFFFFFFFFFFF.
+-type uint64() :: 0..16#FFFFFFFFFFFFFFFF. 
 
 -type bind_response() :: ok | {error, _}.
 -type append_response() :: ok | {error, _}.

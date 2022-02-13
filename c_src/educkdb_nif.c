@@ -1064,7 +1064,7 @@ educkdb_bind_uint16(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     bind_value = (uint16_t) value;
 
-    if(duckdb_bind_uint16(stmt->statement, (idx_t) index, value) == DuckDBError) {
+    if(duckdb_bind_uint16(stmt->statement, (idx_t) index, bind_value) == DuckDBError) {
         return atom_error;
     }
 
@@ -1759,7 +1759,6 @@ static ErlNifFunc nif_funcs[] = {
     {"append_double", 2, educkdb_append_double},
     {"append_varchar", 2, educkdb_append_varchar},
     {"append_null", 1, educkdb_append_null},
-
     {"appender_flush", 1, educkdb_appender_flush, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"appender_end_row", 1, educkdb_appender_end_row}
 };
