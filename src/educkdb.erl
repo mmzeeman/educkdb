@@ -47,6 +47,7 @@
     extract_result/1,
 
     appender_create/3,
+    append_boolean/2,
     append_int8/2,
     append_int16/2,
     append_int32/2,
@@ -273,6 +274,17 @@ extract_result(_Result) ->
 
 -spec appender_create(connection(), string(), string()) -> {ok, appender()} | {error, _}. 
 appender_create(_Connection, _Schema, _Table) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec append_boolean(appender(), boolean()) -> append_response().
+append_boolean(Appender, true) ->
+    append_boolean_intern(Appender, 1);
+append_boolean(Appender, false) ->
+    append_boolean_intern(Appender, 0).
+
+
+-spec append_boolean_intern(appender(), int32()) -> append_response().
+append_boolean_intern(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec append_int8(appender(), int8()) -> append_response().
