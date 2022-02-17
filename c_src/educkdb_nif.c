@@ -1316,6 +1316,37 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_append_boolean(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_appender *appender;
+    int value;
+    bool append_value;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_appender_type, (void **) &appender)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_int(env, argv[1], &value)) {
+        return enif_make_badarg(env);
+    }
+
+    if(value > INT8_MAX || value < INT8_MIN) {
+        return enif_make_badarg(env);
+    }
+
+    append_value = (value != 0);
+
+    if(duckdb_append_bool(appender->appender, append_value) == DuckDBError) {
+        return get_appender_error(env, appender->appender);
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
 educkdb_append_int8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_appender *appender;
     int value;
@@ -1331,7 +1362,7 @@ educkdb_append_int8(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     if(!enif_get_int(env, argv[1], &value)) {
         return enif_make_badarg(env);
-    } 
+    }
 
     if(value > INT8_MAX || value < INT8_MIN) {
         return enif_make_badarg(env);
@@ -1747,6 +1778,7 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_null", 2, educkdb_bind_null},
 
     {"appender_create", 3, educkdb_appender_create},
+    {"append_boolean_intern", 2, educkdb_append_boolean},
     {"append_int8", 2, educkdb_append_int8},
     {"append_int16", 2, educkdb_append_int16},
     {"append_int32", 2, educkdb_append_int32},

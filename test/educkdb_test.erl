@@ -503,7 +503,36 @@ appender_append_uint8_test() ->
     {ok,[{column, <<"a">>, utinyint}, {column, <<"b">>, utinyint}],
      [[0, ?UINT8_MAX], [1,2],[3,4]]} = q(Conn, "select * from test order by a;"),
     ok.
+
+appender_append_boolean_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a boolean, b boolean);"),
+
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_boolean(Appender, true),
+    ok = educkdb:append_boolean(Appender, false),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_boolean(Appender, false),
+    ok = educkdb:append_boolean(Appender, false),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_boolean(Appender, true),
+    ok = educkdb:append_boolean(Appender, true),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
  
+    {ok,[{column, <<"a">>, boolean},
+         {column, <<"b">>, boolean}],
+     [[false, false],
+      [true,  false],
+      [true,  true]]} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
 garbage_collect_test() ->
     F = fun() ->
                 {ok, Db} = educkdb:open(":memory:"),
