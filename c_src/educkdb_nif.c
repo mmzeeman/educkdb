@@ -427,7 +427,11 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     unsigned int size;
     educkdb_database *database;
     ERL_NIF_TERM educkdb_database;
+    ERL_NIF_TERM key, value;
+    ErlNifMapIterator opts_iter;
     duckdb_state rc;
+    duckdb_config config;
+    char *open_error;
 
     if(argc != 2)
         return enif_make_badarg(env);
@@ -438,14 +442,46 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
     /* [TODO] get options from the second attribute */
 
+    // create the configuration object
+    if (duckdb_create_config(&config) == DuckDBError) {
+        return make_error_tuple(env, "create_config");
+    }
+
+    if(!enif_map_iterator_create(env, argv[1], &opts_iter, ERL_NIF_MAP_ITERATOR_FIRST)) {
+        fprintf(stderr, "not a map\n");
+        return enif_make_badarg(env);
+    }
+    while(enif_map_iterator_get_pair(env, &opts_iter, &key, &value)) {
+        char key_str[50];
+        char value_str[50];
+
+        if(enif_get_atom(env, argv[1], key_str, sizeof(key_str), ERL_NIF_LATIN1)) {
+            continue;
+        }
+
+        if(enif_get_string(env, argv[0], filename, MAX_PATHNAME, ERL_NIF_LATIN1) <= 0) {
+            continue;
+        }
+        
+        duckdb_set_config(&config, key_str, value_str);
+
+        enif_map_iterator_next(env, &opts_iter);
+    }
+    enif_map_iterator_destroy(env, &opts_iter);
+
     database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database));
     if(!database)
         return make_error_tuple(env, "no_memory");
 
-    rc = duckdb_open(filename, &(database->database));
+    rc = duckdb_open_ext(filename, &(database->database), config, &open_error);
     if(rc == DuckDBError) {
-        // [TODO] use duckdb_open_ext, it can report back error messages.
-        return atom_error;
+        ERL_NIF_TERM erl_error_msg = enif_make_string(env, &open_error, ERL_NIF_LATIN1);
+        ERL_NIF_TERM error_tuple = enif_make_tuple2(env, atom_error,
+                enif_make_tuple2(env,
+                    make_atom(env, "open"), erl_error_msg));
+
+        duckdb_free(&open_error);
+        return error_tuple;
     }
 
     educkdb_database = enif_make_resource(env, database);
