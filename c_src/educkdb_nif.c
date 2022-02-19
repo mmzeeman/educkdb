@@ -448,7 +448,6 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
     if(!enif_map_iterator_create(env, argv[1], &opts_iter, ERL_NIF_MAP_ITERATOR_FIRST)) {
-        fprintf(stderr, "not a map\n");
         return enif_make_badarg(env);
     }
     while(enif_map_iterator_get_pair(env, &opts_iter, &key, &value)) {
@@ -470,17 +469,17 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     enif_map_iterator_destroy(env, &opts_iter);
 
     database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database));
-    if(!database)
+    if(!database) {
         return make_error_tuple(env, "no_memory");
+    }
 
     rc = duckdb_open_ext(filename, &(database->database), config, &open_error);
     if(rc == DuckDBError) {
-        ERL_NIF_TERM erl_error_msg = enif_make_string(env, &open_error, ERL_NIF_LATIN1);
+        ERL_NIF_TERM erl_error_msg = enif_make_string(env, open_error, ERL_NIF_LATIN1);
         ERL_NIF_TERM error_tuple = enif_make_tuple2(env, atom_error,
                 enif_make_tuple2(env,
                     make_atom(env, "open"), erl_error_msg));
-
-        duckdb_free(&open_error);
+        duckdb_free(open_error);
         return error_tuple;
     }
 
@@ -500,15 +499,47 @@ educkdb_close(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
     educkdb_database *db;
 
-    if(argc != 1)
+    if(argc != 1) {
         return enif_make_badarg(env);
+    }
 
-    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db))
+    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db)) {
         return enif_make_badarg(env);
+    }
 
     duckdb_close(&(db->database));
 
     return atom_ok;
+}
+
+/*
+ * Get a list of config flags
+ */
+static ERL_NIF_TERM
+educkdb_config_flag_info(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+    size_t config_count = duckdb_config_count();
+    const char *name;
+    const char *description;
+    unsigned int i;
+
+    ERL_NIF_TERM info_map;
+
+    if(argc != 0) {
+        return enif_make_badarg(env);
+    }
+
+    info_map = enif_make_new_map(env);
+
+    for(i = 0; i < config_count; i++) {
+        duckdb_get_config_flag(i, &name, &description);
+        enif_make_map_put(env, info_map,
+                make_atom(env, name),
+                make_binary(env, description, strlen(description)),
+                &info_map);
+    }
+
+    return info_map;
 }
 
 /*
@@ -526,11 +557,13 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     duckdb_state rc;
     ERL_NIF_TERM db_conn;
 
-    if(argc != 1)
+    if(argc != 1) {
         return enif_make_badarg(env);
+    }
 
-    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db))
+    if(!enif_get_resource(env, argv[0], educkdb_database_type, (void **) &db)) {
         return enif_make_badarg(env);
+    }
 
     /* Initialize the connection resource */
     conn = enif_alloc_resource(educkdb_connection_type, sizeof(educkdb_connection));
@@ -1789,7 +1822,8 @@ static int on_upgrade(ErlNifEnv* env, void** priv, void** old_priv_data, ERL_NIF
 static ErlNifFunc nif_funcs[] = {
     {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    
+    {"config_flag_info", 0, educkdb_config_flag_info},
+
     {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
 

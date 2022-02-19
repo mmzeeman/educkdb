@@ -22,6 +22,7 @@
 -export([
     open/1, open/2,
     close/1,
+    config_flag_info/0,
 
     connect/1,
     disconnect/1,
@@ -148,6 +149,11 @@ close(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
  
 
+%% @doc Return a list with config flags, and explanation
+-spec config_flag_info() -> map().
+config_flag_info() ->
+    erlang:nif_error(nif_library_not_loaded).
+ 
 %%
 %% Query
 %%
