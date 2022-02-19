@@ -40,9 +40,26 @@
 -define(INT64_MAX,   9223372036854775807).
 -define(UINT64_MAX, 18446744073709551615).
 
-open_single_database_test() ->
+educk_db_version_test() ->
     {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    ?assertEqual({ok,
+                  [{column, <<"library_version">>, varchar}, {column, <<"source_id">>, varchar}],
+                  [[<<"0.3.1">>, <<"88aa81c6b">>]]},
+                 q(Conn, <<"PRAGMA version;">>)),
+
+    ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
+    ok.
+
+open_single_database_test() ->
+    {ok, Db1} = educkdb:open(":memory:"),
+    ok = educkdb:close(Db1),
+
+    {ok, Db2} = educkdb:open(":memory:", #{threads => "2"}),
+    ok = educkdb:close(Db2),
+
     ok.
 
 open_and_connect_test() ->
@@ -56,6 +73,36 @@ open_connect_and_disconnect_test() ->
     {ok, Conn} = educkdb:connect(Db),
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
+    ok.
+
+open_options_test() ->
+    %% [note] newer duckdb versions can have new config flags.
+    InfoMap = #{access_mode => 
+                    <<"Access mode of the database ([AUTOMATIC], READ_ONLY or READ_WRITE)">>,
+                default_null_order =>
+                    <<"Null ordering used when none is specified ([NULLS_FIRST] or NULLS_LAST)">>,
+                default_order =>
+                    <<"The order type used when none is specified ([ASC] or DESC)">>,
+                enable_external_access =>
+                    <<"Allow the database to access external state (through e.g. COPY TO/FROM, CSV readers, pandas replacement scans, etc)">>,
+                enable_object_cache =>
+                    <<"Whether or not object cache is used to cache e.g. Parquet metadata">>,
+                max_memory =>
+                    <<"The maximum memory of the system (e.g. 1GB)">>,
+                threads =>
+                    <<"The number of total threads used by the system">>},
+    ?assertEqual(InfoMap, educkdb:config_flag_info()),
+
+    {ok, Db1} = educkdb:open(":memory:", #{threads => "2"}),
+    ok = educkdb:close(Db1),
+
+    %% Check if error reporting works
+    {error, {open, "IO Error: The file is not a valid DuckDB database file!"}}
+        = educkdb:open("README.md", #{ access_mode => "READ_ONLY" }),
+
+    {error,{open,"IO Error: Cannot open file \".\": Is a directory"}}
+        = educkdb:open(".", #{ access_mode => "READ_ONLY" }),
+
     ok.
 
 query_test() ->
