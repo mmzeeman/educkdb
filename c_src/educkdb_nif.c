@@ -19,6 +19,7 @@
 */
 
 #include <erl_nif.h>
+#include <sys/time.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -28,7 +29,7 @@
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
-#define CHUNK_SIZE 1000 /* THe target number of cells to get in one step */
+#define CHUNK_SIZE 500             /* The target number of cells to get from a query result in one step before yielding */
 
 #define NIF_NAME "educkdb_nif"
 
@@ -773,6 +774,9 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
     educkdb_result *res;
     ERL_NIF_TERM column_info, rows, row, cell;
     unsigned long int row_count, column_count, from_row, downto_row, row_chunk_size;
+    int pct;
+    struct timeval start, stop, slice;
+    gettimeofday(&start, NULL);
 
     if(argc != 6) {
         return enif_make_badarg(env);
@@ -820,6 +824,28 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
         new_argv[4] = enif_make_uint64(env, downto_row - min_idx(downto_row, row_chunk_size));
         new_argv[5] = argv[5];
 
+        gettimeofday(&stop, NULL);
+        timersub(&stop, &start, &slice);
+        pct = (int)((slice.tv_sec*1000000+slice.tv_usec)/10);
+        if (pct > 100) {
+            pct = 100;
+        } else if (pct == 0) {
+            pct = 1;
+        } else {
+        }
+
+        /* Adjust the row_chunk_size when needed */
+        if(pct < 20) {
+            new_argv[5] = enif_make_uint64(env, row_chunk_size + CHUNK_SIZE);
+        } else if(pct > 80) {
+            new_argv[5] = enif_make_uint64(env, row_chunk_size / 2);
+        } else {
+            new_argv[5] = argv[5];
+        }
+
+        /* Inform the scheduler how much time we used */
+        enif_consume_timeslice(env, pct);
+        
         return enif_schedule_nif(env, "yield_extract_result", 0, educkdb_yield_extract_result, argc, new_argv);
     }
 
@@ -1782,7 +1808,7 @@ educkdb_append_varchar(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    if(!enif_inspect_iolist_as_binary(env, argv[2], &binary)) {
+    if(!enif_inspect_iolist_as_binary(env, argv[1], &binary)) {
         return make_error_tuple(env, "no_iodata");
     }
 
