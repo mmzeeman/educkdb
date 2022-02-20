@@ -18,6 +18,8 @@
  * duckdb_nif
 */
 
+#define _BSD_SOURCE
+
 #include <erl_nif.h>
 #include <sys/time.h>
 #include <string.h>
