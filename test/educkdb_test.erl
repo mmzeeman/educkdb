@@ -580,6 +580,38 @@ appender_append_boolean_test() ->
 
     ok.
 
+yielding_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = q(Conn, "create table test(a integer, b varchar, c varchar);"),
+
+    %% Insert a lot of records to ensure yielding takes place records 
+    Values = lists:seq(1, 100000),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+    {ok, [], []} = q(Conn, "begin;"),
+    lists:foreach(fun(V) ->
+                          ok = educkdb:append_int32(Appender, V),
+                          ok = educkdb:append_varchar(Appender, "this is a test 123"),
+                          ok = educkdb:append_varchar(Appender, "and this too"),
+                          ok = educkdb:appender_end_row(Appender)
+                  end,
+                  Values),
+    educkdb:appender_flush(Appender),
+    {ok, [], []} = q(Conn, "commit;"),
+
+    ?assertEqual({ok, [{column,<<"count">>,bigint}], [[length(Values)]]}, q(Conn, "select count(*) as count from test;")),
+
+    {ok, _, Rows} = q(Conn, "select a from test order by a;"),
+    ?assertEqual(length(Values), length(Rows)),
+    RowValues = lists:flatten(Rows),
+    Values = RowValues,
+
+    {ok, _, _} = q(Conn, "select * from test order by a;"),
+
+    ok.
+
+
+
 garbage_collect_test() ->
     F = fun() ->
                 {ok, Db} = educkdb:open(":memory:"),
