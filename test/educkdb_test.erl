@@ -585,7 +585,8 @@ yielding_test() ->
     {ok, Conn} = educkdb:connect(Db),
     {ok, [], []} = q(Conn, "create table test(a integer, b varchar, c varchar);"),
 
-    Values = lists:seq(1, 1_000_000),
+    %% Insert a lot of records to ensure yielding takes place records 
+    Values = lists:seq(1, 100000),
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
     {ok, [], []} = q(Conn, "begin;"),
     lists:foreach(fun(V) ->
