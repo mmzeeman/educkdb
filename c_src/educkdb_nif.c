@@ -28,6 +28,8 @@
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
+#define CHUNK_SIZE 1000 /* THe target number of cells to get in one step */
+
 #define NIF_NAME "educkdb_nif"
 
 static ErlNifResourceType *educkdb_database_type = NULL;
@@ -754,6 +756,80 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
     }
 }
 
+inline static idx_t
+min_idx(idx_t a, idx_t b) {
+    if(a < b) return a;
+    return b;
+}
+
+inline static idx_t
+max_idx(idx_t a, idx_t b) {
+    if(a > b) return a;
+    return b;
+}
+
+static ERL_NIF_TERM
+educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    ERL_NIF_TERM column_info, rows, row, cell;
+    unsigned long int row_count, column_count, from_row, downto_row, row_chunk_size;
+
+    if(argc != 6) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+    row_count = duckdb_row_count(&(res->result));
+    column_count = duckdb_column_count(&(res->result));
+
+    if(!enif_is_list(env, argv[2])) {
+        return enif_make_badarg(env);
+    }
+    if(!enif_get_uint64(env, argv[3], &from_row)) {
+        return enif_make_badarg(env);
+    }
+    if(!enif_get_uint64(env, argv[4], &downto_row)) {
+        return enif_make_badarg(env);
+    }
+
+    rows = argv[2];
+    for(idx_t r=from_row; r-- > downto_row; ) {
+        row = enif_make_list(env, 0);
+
+        for(idx_t c=column_count; c-- > 0; ) {
+            cell = make_cell(env, &(res->result), c, r);
+            row = enif_make_list_cell(env, cell, row);
+        }
+        rows = enif_make_list_cell(env, row, rows);
+    }
+
+    if(downto_row != 0) {
+        // Schedule another batch;
+        if(!enif_get_uint64(env, argv[5], &row_chunk_size)) {
+            return enif_make_badarg(env);
+        }
+
+        ERL_NIF_TERM new_argv[6];
+
+        new_argv[0] = argv[0];
+        new_argv[1] = argv[1];
+        new_argv[2] = rows;
+        new_argv[3] = argv[4];
+        new_argv[4] = enif_make_uint64(env, downto_row - min_idx(downto_row, row_chunk_size));
+        new_argv[5] = argv[5];
+
+        return enif_schedule_nif(env, "yield_extract_result", 0, educkdb_yield_extract_result, argc, new_argv);
+    }
+
+    if(!enif_is_list(env, argv[1])) {
+        return enif_make_badarg(env);
+    }
+
+    return enif_make_tuple3(env, atom_ok, argv[1], rows);
+}
+
 
 static ERL_NIF_TERM
 educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -770,15 +846,16 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     ERL_NIF_TERM type_atom;
     ERL_NIF_TERM name_binary;
 
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
     if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
         return enif_make_badarg(env);
     }
 
     /* For small number of results we can directly return the results without
      * rescheduling the nif.
-     *
-     * [TODO] find out how much cells we can handle in about 1ms.
-     * [todo] implement as yielding nif.
      */
 
     /* Column info */
@@ -793,10 +870,6 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         for(c=column_count; c-- > 0; ) {
             column_name = duckdb_column_name(&(res->result), c);
             name_binary = make_binary(env, column_name, strlen(column_name));
-            if(name_binary == atom_error) {
-                /* [todo] handle error */
-            }
-
             column_type_name = duckdb_type_name(duckdb_column_type(&(res->result), c));
             type_atom = make_atom(env, column_type_name);
 
@@ -807,17 +880,27 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     
     /* Rows */
     rows = enif_make_list(env, 0);
-    for(r=row_count; r-- > 0; ) {
-        row = enif_make_list(env, 0);
-
-        for(c=column_count; c-- > 0; ) {
-            cell = make_cell(env, &(res->result), c, r);
-            row = enif_make_list_cell(env, cell, row);
-        }
-        rows = enif_make_list_cell(env, row, rows);
+    if(row_count == 0) {
+        return enif_make_tuple3(env, atom_ok, column_info, rows);
     }
-        
-    return enif_make_tuple3(env, atom_ok, column_info, rows);
+
+    /* Prepare args for yielding nif call */
+    ERL_NIF_TERM new_args[6];
+
+    /* Determine the number of rows we can return in one yield call */
+    idx_t row_chunk_size = 1;
+    if(row_count > 0 && column_count > 0 && column_count < CHUNK_SIZE) {
+        row_chunk_size = CHUNK_SIZE / column_count;
+    }
+
+    new_args[0] = argv[0];
+    new_args[1] = column_info;
+    new_args[2] = rows;
+    new_args[3] = enif_make_uint64(env, (unsigned long int) row_count); 
+    new_args[4] = enif_make_uint64(env, (unsigned long int) row_count - min_idx(row_count, row_chunk_size)); 
+    new_args[5] = enif_make_uint64(env, (unsigned long int) row_chunk_size);
+
+    return educkdb_yield_extract_result(env, 6, new_args);
 }
 
 /*
