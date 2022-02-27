@@ -614,7 +614,17 @@ current_schema_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    ?assertEqual([], educkdb:squery(Conn, "select current_schemas(true);")),
+    %% This returns an unkown error because the return type (a list) is not
+    %% something which can be returned. Somehow no error message is attached 
+    %% from the duckdb side. Could change in the future.
+    ?assertEqual({error, unknown}, educkdb:squery(Conn, "select current_schemas(true);")),
+
+    %% FYI, the result must be unnested first.
+    ?assertEqual( {ok,[{column,<<"current_schemas">>,varchar}],
+                   [[<<"temp">>],
+                    [<<"main">>],
+                    [<<"pg_catalog">>]]},
+                   educkdb:squery(Conn, "SELECT UNNEST(current_schemas(true)) as current_schemas;")),
 
     ok.
 
