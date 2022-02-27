@@ -65,10 +65,16 @@
     appender_end_row/1
 ]).
 
+%% High Level Api
+-export([
+    squery/2
+]).
+
 %% low-level api
 
 -export([
-    query_cmd/2
+    query_cmd/2,
+    execute_prepared_cmd/1
 ]).
 
 -type database() :: reference().
@@ -349,4 +355,18 @@ appender_flush(_Appender) ->
 -spec appender_end_row(appender()) -> append_response().
 appender_end_row(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
+
+%%
+%% Higher Level API
+%%
+
+%% @doc Do a simple sql query without parameters.
+squery(Connection, Sql) ->
+    case query(Connection, Sql) of
+        {ok, Result} ->
+            extract_result(Result);
+        {error, _}=E ->
+            E
+    end.
+
 

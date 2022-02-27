@@ -289,6 +289,26 @@ duckdb_type_name(duckdb_type t) {
 }
 
 static ERL_NIF_TERM
+handle_query_error(ErlNifEnv *env, educkdb_result *result) {
+    /* Don't pass errors as a result data structure, but as an error tuple
+     * with the error message in it.
+     */
+    const char *error_msg = duckdb_result_error(&(result->result)); 
+    enif_release_resource(result);
+
+    /* check if there is an error message, return {error, unknown} otherwise */
+    if(error_msg == NULL) {
+        return enif_make_tuple2(env, atom_error, make_atom(env, "unknown"));
+    } 
+
+    ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+    return enif_make_tuple2(env, atom_error,
+            enif_make_tuple2(env,
+                make_atom(env, "result"), erl_error_msg));
+} 
+
+
+static ERL_NIF_TERM
 do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
     ErlNifBinary bin;
     educkdb_result *result;
@@ -309,16 +329,7 @@ do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
      * The result datastructure is passed back
      */
     if(duckdb_query(conn->connection, (char *) bin.data, &(result->result)) == DuckDBError) {
-        /* Don't pass errors as a result data structure, but as an error tuple
-         * with the error message in it.
-         */
-        const char *error_msg = duckdb_result_error(&(result->result)); 
-        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
-        enif_release_resource(result);
-
-        return enif_make_tuple2(env, atom_error,
-                enif_make_tuple2(env,
-                    make_atom(env, "result"), erl_error_msg));
+        return handle_query_error(env, result);
     }
 
     eresult = enif_make_resource(env, result);
@@ -338,16 +349,7 @@ do_execute_prepared(ErlNifEnv *env, educkdb_prepared_statement *stmt, const ERL_
     }
 
     if(duckdb_execute_prepared(stmt->statement, &(result->result)) == DuckDBError) {
-        /* Don't pass errors as a result data structure, but as an error tuple
-         * with the error message in it.
-         */
-        const char *error_msg = duckdb_result_error(&(result->result));
-        ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
-        enif_release_resource(result);
-
-        return enif_make_tuple2(env, atom_error,
-                enif_make_tuple2(env,
-                    make_atom(env, "result"), erl_error_msg));
+        return handle_query_error(env, result);
     }
 
     eresult = enif_make_resource(env, result);
