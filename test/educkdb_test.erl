@@ -610,6 +610,13 @@ yielding_test() ->
 
     ok.
 
+current_schema_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    ?assertEqual([], educkdb:squery(Conn, "select current_schemas(true);")),
+
+    ok.
 
 
 garbage_collect_test() ->
