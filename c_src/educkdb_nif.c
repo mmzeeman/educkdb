@@ -30,6 +30,7 @@
 
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
+#define DAY_EPOCH 719528            /* days since {0, 1, 1} -> {1970, 1, 1} */
 
 #define CHUNK_SIZE 500             /* The target number of cells to get from a query result in one step before yielding */
 
@@ -729,17 +730,20 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
             return make_atom(env, "todo");
 
         case DUCKDB_TYPE_DATE:
-            return make_atom(env, "todo");
-
+            {
+                duckdb_date value = duckdb_value_date(result, col, row);
+                return enif_make_int(env, (int) (value.days - DAY_EPOCH));
+            }
         case DUCKDB_TYPE_TIME:
-            return make_atom(env, "todo");
-
+            {
+                duckdb_time value = duckdb_value_time(result, col, row);
+                return enif_make_int64(env, (ErlNifSInt64) value.micros);
+            }
         case DUCKDB_TYPE_INTERVAL:
             return make_atom(env, "todo");
         case DUCKDB_TYPE_HUGEINT:
             // record with two 64 bit integers
             return make_atom(env, "todo");
-
         case DUCKDB_TYPE_VARCHAR:
             {
                 char *value = duckdb_value_varchar(result, col, row);
@@ -776,7 +780,7 @@ max_idx(idx_t a, idx_t b) {
 static ERL_NIF_TERM
 educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
-    ERL_NIF_TERM column_info, rows, row, cell;
+    ERL_NIF_TERM rows, row, cell;
     unsigned long int row_count, column_count, from_row, downto_row, row_chunk_size;
     int pct;
     struct timeval start, stop, slice;
@@ -864,14 +868,14 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
 static ERL_NIF_TERM
 educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
-    idx_t c, r;
+    idx_t c;
     idx_t row_count, column_count;
     const char *column_name;
     const char *column_type_name;
 
     ERL_NIF_TERM column_info;
     ERL_NIF_TERM column_info_tuple;
-    ERL_NIF_TERM rows, row, cell;
+    ERL_NIF_TERM rows;
 
     ERL_NIF_TERM type_atom;
     ERL_NIF_TERM name_binary;
@@ -1364,6 +1368,68 @@ educkdb_bind_double(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     } 
 
     if(duckdb_bind_double(stmt->statement, (idx_t) index, value) == DuckDBError) {
+        return atom_error;
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_bind_date(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+    int value; // in gregorian days 
+    duckdb_date date;
+
+    if(argc != 3) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+    
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(!enif_get_int(env, argv[2], &value)) {
+        return atom_error;
+    }
+
+    date.days = value + DAY_EPOCH;
+    if(duckdb_bind_date(stmt->statement, (idx_t) index, date) == DuckDBError) {
+        return atom_error;
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_bind_time(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+    ErlNifSInt64 value;
+    duckdb_time time; // microseconds since 00:00:00:000
+
+    if(argc != 3) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+    
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(!enif_get_int64(env, argv[2], &value)) {
+        return enif_make_badarg(env);
+    }
+
+    time.micros = value;
+    if(duckdb_bind_time(stmt->statement, (idx_t) index, time) == DuckDBError) {
         return atom_error;
     }
 
@@ -1957,7 +2023,12 @@ static ErlNifFunc nif_funcs[] = {
     {"bind_uint64", 3, educkdb_bind_uint64},
     {"bind_float", 3, educkdb_bind_float},
     {"bind_double", 3, educkdb_bind_double},
+
+    {"bind_date_intern", 3, educkdb_bind_date},
+    {"bind_time_intern", 3, educkdb_bind_time},
+
     {"bind_varchar", 3, educkdb_bind_varchar},
+
     {"bind_null", 2, educkdb_bind_null},
 
     {"appender_create", 3, educkdb_appender_create},

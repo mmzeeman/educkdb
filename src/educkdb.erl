@@ -42,6 +42,8 @@
     bind_uint64/3,
     bind_float/3,
     bind_double/3,
+    bind_date/3,
+    bind_time/3,
     bind_varchar/3,
     bind_null/2,
 
@@ -257,6 +259,21 @@ bind_float(_Stmt, _Index, _Value) ->
 
 -spec bind_double(prepared_statement(), idx(), float()) -> bind_response().
 bind_double(_Stmt, _Index, _Value) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+
+bind_date(Stmt, Index, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
+    bind_date_intern(Stmt, Index, calendar:date_to_gregorian_days(Date));
+bind_date(Stmt, Index, Days) when is_integer(Days) ->
+    bind_date_intern(Stmt, Index, Days).
+
+bind_date_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
+    bind_time_intern(Stmt, Index, Micros).
+
+bind_time_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
 % @doc Bind a iolist as varchar. 
