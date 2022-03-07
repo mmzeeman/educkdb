@@ -262,6 +262,30 @@ bind_float_and_double_test() ->
 
     ok.
 
+bind_date_and_time_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a date, b time);"),
+
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_date(Insert, 1,  {1970, 8, 11}),
+    ok = educkdb:bind_time(Insert, 2,  0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_date(Insert, 1,  {1970, 1, 1}),
+    ok = educkdb:bind_time(Insert, 2,  0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ?assertEqual({ok,
+                  [ {column, <<"a">>, date}, {column, <<"b">>, time}],
+                  [ [0.0, 0.0] ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+
 bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),

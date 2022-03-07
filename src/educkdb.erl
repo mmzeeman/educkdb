@@ -261,7 +261,6 @@ bind_float(_Stmt, _Index, _Value) ->
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
-
 bind_date(Stmt, Index, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
     bind_date_intern(Stmt, Index, calendar:date_to_gregorian_days(Date));
 bind_date(Stmt, Index, Days) when is_integer(Days) ->

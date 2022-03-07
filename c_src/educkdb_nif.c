@@ -732,7 +732,7 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
         case DUCKDB_TYPE_DATE:
             {
                 duckdb_date value = duckdb_value_date(result, col, row);
-                return enif_make_int(env, (int) (value.days - DAY_EPOCH));
+                return enif_make_int(env, (int) (value.days + DAY_EPOCH));
             }
         case DUCKDB_TYPE_TIME:
             {
@@ -1397,7 +1397,7 @@ educkdb_bind_date(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return atom_error;
     }
 
-    date.days = value + DAY_EPOCH;
+    date.days = value - DAY_EPOCH;
     if(duckdb_bind_date(stmt->statement, (idx_t) index, date) == DuckDBError) {
         return atom_error;
     }
