@@ -732,7 +732,12 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
         case DUCKDB_TYPE_DATE:
             {
                 duckdb_date value = duckdb_value_date(result, col, row);
-                return enif_make_int(env, (int) (value.days + DAY_EPOCH));
+                duckdb_date_struct date = duckdb_from_date(value);
+                
+                return enif_make_tuple3(env,
+                        enif_make_int(env, date.year),
+                        enif_make_int(env, date.month),
+                        enif_make_int(env, date.day));
             }
         case DUCKDB_TYPE_TIME:
             {
