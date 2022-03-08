@@ -742,7 +742,12 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
         case DUCKDB_TYPE_TIME:
             {
                 duckdb_time value = duckdb_value_time(result, col, row);
-                return enif_make_int64(env, (ErlNifSInt64) value.micros);
+                duckdb_time_struct time = duckdb_from_time(value);
+
+                return enif_make_tuple3(env,
+                        enif_make_int(env, time.hour),
+                        enif_make_int(env, time.min),
+                        enif_make_double(env, (double) time.sec + (time.micros / 1000.0)));
             }
         case DUCKDB_TYPE_INTERVAL:
             return make_atom(env, "todo");

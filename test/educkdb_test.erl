@@ -271,7 +271,7 @@ bind_date_and_time_test() ->
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_date(Insert, 1,  {1970, 8, 11}),
-    ok = educkdb:bind_time(Insert, 2,  0),
+    ok = educkdb:bind_time(Insert, 2,  1111),
 
     {ok, _, [[1]]} = x(Insert),
 
