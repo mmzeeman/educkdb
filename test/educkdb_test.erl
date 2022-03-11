@@ -282,9 +282,26 @@ bind_date_and_time_test() ->
 
     ?assertEqual({ok,
                   [ {column, <<"a">>, date}, {column, <<"b">>, time}],
-                  [ [0.0, 0.0] ]}, educkdb:squery(Conn, "select * from test order by a")),
+                  [ [{1970,1,1}, {0,0,0.0}],
+                    [{1970, 8, 11}, {0,0,1.111}]]}, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
+
+bind_timestamp_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1);"),
+
+    ok = educkdb:bind_timestamp(Insert, 1, 0),
+    {ok, _, [[1]]} = x(Insert),
+    ?assertEqual({ok, [ {column, <<"a">>, timestamp}],
+                         [ [{{1970, 1, 1}, {0, 0, 0.0}}] ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+     
+
 
 bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),

@@ -683,6 +683,22 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+make_date_tuple(ErlNifEnv *env, duckdb_date_struct date) {
+    return enif_make_tuple3(env,
+            enif_make_int(env, date.year),
+            enif_make_int(env, date.month),
+            enif_make_int(env, date.day));
+}
+
+static ERL_NIF_TERM
+make_time_tuple(ErlNifEnv *env, duckdb_time_struct time) {
+    return enif_make_tuple3(env,
+            enif_make_int(env, time.hour),
+            enif_make_int(env, time.min),
+            enif_make_double(env, (double) time.sec + (time.micros / 1000.0)));
+}
+
+static ERL_NIF_TERM
 make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
     if(duckdb_value_is_null(result, col, row)) {
         return atom_null;
@@ -727,27 +743,22 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
                 return enif_make_double(env, value);
             }
         case DUCKDB_TYPE_TIMESTAMP:
-            return make_atom(env, "todo");
-
+            {
+                duckdb_timestamp value = duckdb_value_timestamp(result, col, row);
+                duckdb_timestamp_struct timestamp = duckdb_from_timestamp(value);
+                return enif_make_tuple2(env, make_date_tuple(env, timestamp.date), make_time_tuple(env, timestamp.time));
+            }
         case DUCKDB_TYPE_DATE:
             {
                 duckdb_date value = duckdb_value_date(result, col, row);
                 duckdb_date_struct date = duckdb_from_date(value);
-                
-                return enif_make_tuple3(env,
-                        enif_make_int(env, date.year),
-                        enif_make_int(env, date.month),
-                        enif_make_int(env, date.day));
+                return make_date_tuple(env, date);
             }
         case DUCKDB_TYPE_TIME:
             {
                 duckdb_time value = duckdb_value_time(result, col, row);
                 duckdb_time_struct time = duckdb_from_time(value);
-
-                return enif_make_tuple3(env,
-                        enif_make_int(env, time.hour),
-                        enif_make_int(env, time.min),
-                        enif_make_double(env, (double) time.sec + (time.micros / 1000.0)));
+                return make_time_tuple(env, time);
             }
         case DUCKDB_TYPE_INTERVAL:
             return make_atom(env, "todo");

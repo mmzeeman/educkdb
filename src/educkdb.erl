@@ -44,6 +44,7 @@
     bind_double/3,
     bind_date/3,
     bind_time/3,
+    bind_timestamp/3,
     bind_varchar/3,
     bind_null/2,
 
