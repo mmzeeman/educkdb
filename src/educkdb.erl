@@ -269,10 +269,18 @@ bind_date(Stmt, Index, Days) when is_integer(Days) ->
 bind_date_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
+%% @doc 
 bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
     bind_time_intern(Stmt, Index, Micros).
 
 bind_time_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc 
+bind_timestamp(Stmt, Index, Micros) when is_integer(Micros) ->
+    bind_timestamp_intern(Stmt, Index, Micros).
+
+bind_timestamp_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
 % @doc Bind a iolist as varchar. 

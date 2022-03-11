@@ -1447,6 +1447,37 @@ educkdb_bind_time(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_bind_timestamp(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+    ErlNifSInt64 value;
+    duckdb_timestamp timestamp;
+
+    if(argc != 3) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+    
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    if(!enif_get_int64(env, argv[2], &value)) {
+        return enif_make_badarg(env);
+    }
+
+    timestamp.micros = value;
+    if(duckdb_bind_timestamp(stmt->statement, (idx_t) index, timestamp) == DuckDBError) {
+        return atom_error;
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
 educkdb_bind_varchar(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     ErlNifUInt64 index;
@@ -2036,6 +2067,7 @@ static ErlNifFunc nif_funcs[] = {
 
     {"bind_date_intern", 3, educkdb_bind_date},
     {"bind_time_intern", 3, educkdb_bind_time},
+    {"bind_timestamp_intern", 3, educkdb_bind_timestamp},
 
     {"bind_varchar", 3, educkdb_bind_varchar},
 
