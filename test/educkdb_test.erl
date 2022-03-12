@@ -271,7 +271,7 @@ bind_date_and_time_test() ->
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_date(Insert, 1,  {1970, 8, 11}),
-    ok = educkdb:bind_time(Insert, 2,  1111),
+    ok = educkdb:bind_time(Insert, 2,  1000000), %% raw, in microseconds
 
     {ok, _, [[1]]} = x(Insert),
 
@@ -280,26 +280,64 @@ bind_date_and_time_test() ->
 
     {ok, _, [[1]]} = x(Insert),
 
+    ok = educkdb:bind_date(Insert, 1,  {2022, 12, 25}),
+    ok = educkdb:bind_time(Insert, 2,  {8, 12, 10.1234}),
+
+    {ok, _, [[1]]} = x(Insert),
+
     ?assertEqual({ok,
                   [ {column, <<"a">>, date}, {column, <<"b">>, time}],
-                  [ [{1970,1,1}, {0,0,0.0}],
-                    [{1970, 8, 11}, {0,0,1.111}]]}, educkdb:squery(Conn, "select * from test order by a")),
+                  [ [{1970,  1,  1}, { 0,  0, 0.0}],
+                    [{1970,  8, 11}, { 0,  0, 1.0}],
+                    [{2022, 12, 25}, { 8, 12, 10.1234}]
+                  ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+
+extract_timestamp_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('0-01-01');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('1970-01-01');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2003-12-25');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2023-4-3 11:23:16.123456');"),
+
+    ?assertEqual({ok, [ {column, <<"a">>, timestamp}], [
+                           [{{   0,  1,  1}, {0, 0, 0.0}}],
+                           [{{1970,  1,  1}, {0, 0, 0.0}}],
+                           [{{2003, 12, 25}, {0, 0, 0.0}}],
+                           [{{2023,  4,  3}, {11, 23, 16.123456}}]
+                      ]}, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
 bind_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-
     {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+
+    %%
+    %% Test bind
+    %%
+
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1);"),
 
-    ok = educkdb:bind_timestamp(Insert, 1, 0),
+    ok = educkdb:bind_timestamp(Insert, 1, 0), 
     {ok, _, [[1]]} = x(Insert),
-    ?assertEqual({ok, [ {column, <<"a">>, timestamp}],
-                         [ [{{1970, 1, 1}, {0, 0, 0.0}}] ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8,0,0}}),
+    {ok, _, [[1]]} = x(Insert),
+
+    ?assertEqual({ok, [ {column, <<"a">>, timestamp}], [
+        [{{0, 1, 1}, {0, 0, 0.0}}],
+        [{{1970, 8, 11}, {8, 0, 0.0}}]
+    ]}, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
+
      
 
 

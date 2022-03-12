@@ -30,7 +30,9 @@
 
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
+
 #define DAY_EPOCH 719528            /* days since {0, 1, 1} -> {1970, 1, 1} */
+#define MICS_EPOCH 62167219200000000    
 
 #define CHUNK_SIZE 500             /* The target number of cells to get from a query result in one step before yielding */
 
@@ -448,8 +450,6 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     if(size <= 0)
         return make_error_tuple(env, "filename");
 
-    /* [TODO] get options from the second attribute */
-
     // create the configuration object
     if (duckdb_create_config(&config) == DuckDBError) {
         return make_error_tuple(env, "create_config");
@@ -695,7 +695,7 @@ make_time_tuple(ErlNifEnv *env, duckdb_time_struct time) {
     return enif_make_tuple3(env,
             enif_make_int(env, time.hour),
             enif_make_int(env, time.min),
-            enif_make_double(env, (double) time.sec + (time.micros / 1000.0)));
+            enif_make_double(env, (double) time.sec + (time.micros / 1000000.0)));
 }
 
 static ERL_NIF_TERM
@@ -1480,7 +1480,7 @@ educkdb_bind_timestamp(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    timestamp.micros = value;
+    timestamp.micros = value - MICS_EPOCH;
     if(duckdb_bind_timestamp(stmt->statement, (idx_t) index, timestamp) == DuckDBError) {
         return atom_error;
     }
