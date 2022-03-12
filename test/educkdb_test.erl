@@ -688,18 +688,55 @@ appender_append_date_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {ok, [], []} = educkdb:squery(Conn, "create table test(a date);"),
-    %{ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_date(Appender, 0),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_date(Appender, {1901, 10, 10}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_date(Appender, {2032, 4, 29}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
+
+    ?assertEqual({ok,[{column, <<"a">>, date}],
+                  [
+                   [{   0, 1, 1}],
+                   [{1901,10,10}],
+                   [{2032, 4,29}]
+                  ]},
+                 educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
 appender_append_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, [], []} = educkdb:squery(Conn, "create table test(a date);"),
-    %{ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_timestamp(Appender, 0),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_timestamp(Appender, {{1901, 10, 10}, {10, 15, 0}}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_timestamp(Appender, {{2032, 4, 29}, {23, 59, 59}}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
+
+    ?assertEqual({ok,[{column, <<"a">>, timestamp}],
+                  [
+                   [{{   0,  1,  1}, { 0,  0,  0.0}}],
+                   [{{1901, 10, 10}, {10, 15,  0.0}}],
+                   [{{2032,  4, 29}, {23, 59, 59.0}}]
+                  ]},
+                 educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
-
 
 yielding_test() ->
     {ok, Db} = educkdb:open(":memory:"),

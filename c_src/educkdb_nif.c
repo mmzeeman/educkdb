@@ -1548,8 +1548,11 @@ educkdb_bind_null(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 static ERL_NIF_TERM
 get_appender_error(ErlNifEnv *env, duckdb_appender appender) {
     const char *error_msg = duckdb_appender_error(appender);
-    ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
+    if(!error_msg) {
+        return enif_make_tuple2(env, atom_error, make_atom(env, "unknown"));
+    }
 
+    ERL_NIF_TERM erl_error_msg = enif_make_string(env, error_msg, ERL_NIF_LATIN1);
     return enif_make_tuple2(env, atom_error,
             enif_make_tuple2(env,
                 make_atom(env, "appender"), erl_error_msg));
