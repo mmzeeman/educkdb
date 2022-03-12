@@ -42,6 +42,9 @@
     bind_uint64/3,
     bind_float/3,
     bind_double/3,
+    bind_date/3,
+    bind_time/3,
+    bind_timestamp/3,
     bind_varchar/3,
     bind_null/2,
 
@@ -59,6 +62,9 @@
     append_uint64/2,
     append_float/2,
     append_double/2,
+    append_time/2,
+    append_date/2,
+    append_timestamp/2,
     append_varchar/2,
     append_null/1,
     appender_flush/1,
@@ -107,6 +113,10 @@
               uint8/0, uint16/0, uint32/0, uint64/0,
               idx/0
              ]).
+
+-define(SEC_TO_MICS(S), (S * 1000000)).
+-define(MIN_TO_MICS(S), (S * 60000000)).
+-define(HOUR_TO_MICS(S), (S * 3600000000)).
 
 -on_load(init/0).
 
@@ -259,6 +269,37 @@ bind_float(_Stmt, _Index, _Value) ->
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+%% @doc 
+bind_date(Stmt, Index, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
+    bind_date_intern(Stmt, Index, calendar:date_to_gregorian_days(Date));
+bind_date(Stmt, Index, Days) when is_integer(Days) ->
+    bind_date_intern(Stmt, Index, Days).
+
+-spec bind_date_intern(prepared_statement(), idx(), integer()) -> bind_response().
+bind_date_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc 
+bind_time(Stmt, Index, {H, M, S}) -> 
+    bind_time_intern(Stmt, Index, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
+bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
+    bind_time_intern(Stmt, Index, Micros).
+
+bind_time_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc 
+bind_timestamp(Stmt, Index, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
+    Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
+    RemMillies = floor(?SEC_TO_MICS(Second)),
+    bind_timestamp_intern(Stmt, Index, Millies + RemMillies);
+bind_timestamp(Stmt, Index, Micros) when is_integer(Micros) ->
+    bind_timestamp_intern(Stmt, Index, Micros).
+
+bind_timestamp_intern(_Stmt, _Index, _Value) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+
 % @doc Bind a iolist as varchar. 
 % Note: be really carefull, value must be valid utf8 data.
 -spec bind_varchar(prepared_statement(), idx(), iodata()) -> bind_response().
@@ -268,7 +309,6 @@ bind_varchar(_Stmt, _Index, _Value) ->
 -spec bind_null(prepared_statement(), idx()) -> bind_response().
 bind_null(_Stmt, _Index) ->
     erlang:nif_error(nif_library_not_loaded).
-
 
 %%
 %% Results
@@ -338,6 +378,37 @@ append_float(_Appender, _Integer) ->
 -spec append_double(appender(), float()) -> append_response().
 append_double(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
+
+%% @doc 
+append_time(Appender, {H, M, S}) -> 
+    append_time_intern(Appender, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
+append_time(Appender, Micros) when is_integer(Micros) ->
+    append_time_intern(Appender, Micros).
+
+append_time_intern(_Appender, _Time) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc 
+append_date(Appender, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
+    append_date_intern(Appender, calendar:date_to_gregorian_days(Date));
+append_date(Appender, Days) when is_integer(Days) ->
+    append_date_intern(Appender, Days).
+
+append_date_intern(_Appender, _Date) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+
+%% @doc 
+append_timestamp(Appender, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
+    Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
+    RemMillies = floor(?SEC_TO_MICS(Second)),
+    append_timestamp_intern(Appender, Millies + RemMillies);
+append_timestamp(Appender, Micros) when is_integer(Micros) ->
+    append_timestamp_intern(Appender, Micros).
+
+append_timestamp_intern(_Appender, _Timestamp) ->
+    erlang:nif_error(nif_library_not_loaded).
+
 
 -spec append_varchar(appender(), iodata()) -> append_response().
 append_varchar(_Appender, _IOData) ->

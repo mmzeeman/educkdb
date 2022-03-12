@@ -262,6 +262,83 @@ bind_float_and_double_test() ->
 
     ok.
 
+bind_date_and_time_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a date, b time);"),
+
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
+
+    ok = educkdb:bind_date(Insert, 1,  {1970, 8, 11}),
+    ok = educkdb:bind_time(Insert, 2,  1000000), %% raw, in microseconds
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_date(Insert, 1,  {1970, 1, 1}),
+    ok = educkdb:bind_time(Insert, 2,  0),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_date(Insert, 1,  {2022, 12, 25}),
+    ok = educkdb:bind_time(Insert, 2,  {8, 12, 10.1234}),
+
+    {ok, _, [[1]]} = x(Insert),
+
+    ?assertEqual({ok,
+                  [ {column, <<"a">>, date}, {column, <<"b">>, time}],
+                  [ [{1970,  1,  1}, { 0,  0, 0.0}],
+                    [{1970,  8, 11}, { 0,  0, 1.0}],
+                    [{2022, 12, 25}, { 8, 12, 10.1234}]
+                  ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+
+extract_timestamp_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('0-01-01');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('1970-01-01');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2003-12-25');"),
+    {ok, _, [[1]]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2023-4-3 11:23:16.123456');"),
+
+    ?assertEqual({ok, [ {column, <<"a">>, timestamp}], [
+                           [{{   0,  1,  1}, {0, 0, 0.0}}],
+                           [{{1970,  1,  1}, {0, 0, 0.0}}],
+                           [{{2003, 12, 25}, {0, 0, 0.0}}],
+                           [{{2023,  4,  3}, {11, 23, 16.123456}}]
+                      ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+
+bind_timestamp_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+
+    %%
+    %% Test bind
+    %%
+
+    {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1);"),
+
+    ok = educkdb:bind_timestamp(Insert, 1, 0), 
+    {ok, _, [[1]]} = x(Insert),
+
+    ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8,0,0}}),
+    {ok, _, [[1]]} = x(Insert),
+
+    ?assertEqual({ok, [ {column, <<"a">>, timestamp}], [
+        [{{0, 1, 1}, {0, 0, 0.0}}],
+        [{{1970, 8, 11}, {8, 0, 0.0}}]
+    ]}, educkdb:squery(Conn, "select * from test order by a")),
+
+    ok.
+
+
 bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -577,6 +654,87 @@ appender_append_boolean_test() ->
      [[false, false],
       [true,  false],
       [true,  true]]} = educkdb:squery(Conn, "select * from test order by a;"),
+
+    ok.
+
+appender_append_time_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a time);"),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_time(Appender, 0),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_time(Appender, {10, 10, 10}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_time(Appender, {23, 50, 55.123456}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
+
+    ?assertEqual({ok,[{column, <<"a">>, time}],
+                  [
+                   [{ 0,  0,  0.0}],
+                   [{10, 10, 10.0}],
+                   [{23, 50, 55.123456}]
+                  ]},
+                 educkdb:squery(Conn, "select * from test order by a;")),
+
+    ok.
+
+appender_append_date_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a date);"),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_date(Appender, 0),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_date(Appender, {1901, 10, 10}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_date(Appender, {2032, 4, 29}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
+
+    ?assertEqual({ok,[{column, <<"a">>, date}],
+                  [
+                   [{   0, 1, 1}],
+                   [{1901,10,10}],
+                   [{2032, 4,29}]
+                  ]},
+                 educkdb:squery(Conn, "select * from test order by a;")),
+
+    ok.
+
+appender_append_timestamp_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
+
+    ok = educkdb:append_timestamp(Appender, 0),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_timestamp(Appender, {{1901, 10, 10}, {10, 15, 0}}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:append_timestamp(Appender, {{2032, 4, 29}, {23, 59, 59}}),
+    ok = educkdb:appender_end_row(Appender),
+
+    ok = educkdb:appender_flush(Appender),
+
+    ?assertEqual({ok,[{column, <<"a">>, timestamp}],
+                  [
+                   [{{   0,  1,  1}, { 0,  0,  0.0}}],
+                   [{{1901, 10, 10}, {10, 15,  0.0}}],
+                   [{{2032,  4, 29}, {23, 59, 59.0}}]
+                  ]},
+                 educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
