@@ -115,6 +115,7 @@
              ]).
 
 -define(SEC_TO_MICS(S), (S * 1000000)).
+-define(MIC_TO_SECS(S), (S / 1000000.0)).
 -define(MIN_TO_MICS(S), (S * 60000000)).
 -define(HOUR_TO_MICS(S), (S * 3600000000)).
 
@@ -289,6 +290,9 @@ bind_time_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc 
+bind_timestamp(Stmt, Index, {_,_,Micro}=Ts) ->
+    {{_,_,_}=Date, {Ho, Mi, Se}} = calendar:now_to_universaltime(Ts),
+    bind_timestamp(Stmt, Index, {Date, {Ho, Mi, Se + ?MIC_TO_SECS(Micro)}});
 bind_timestamp(Stmt, Index, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
     Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
     RemMillies = floor(?SEC_TO_MICS(Second)),
@@ -399,6 +403,9 @@ append_date_intern(_Appender, _Date) ->
 
 
 %% @doc 
+append_timestamp(Appender, {_,_,Micro}=Ts) ->
+    {{_,_,_}=Date, {Ho, Mi, Se}} = calendar:now_to_universaltime(Ts),
+    append_timestamp(Appender, {Date, {Ho, Mi, Se + ?MIC_TO_SECS(Micro)}});
 append_timestamp(Appender, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
     Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
     RemMillies = floor(?SEC_TO_MICS(Second)),
