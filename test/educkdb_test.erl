@@ -325,15 +325,23 @@ bind_timestamp_test() ->
 
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1);"),
 
+    %% Plain milliseconds since 0, 1, 1
     ok = educkdb:bind_timestamp(Insert, 1, 0), 
     {ok, _, [[1]]} = x(Insert),
 
+    %% Plain erlang date-time tuple
     ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8,0,0}}),
     {ok, _, [[1]]} = x(Insert),
 
+    %% Erlang timestamp
+    ok = educkdb:bind_timestamp(Insert, 1, {1647, 729383, 983105}),
+    {ok, _, [[1]]} = x(Insert),
+
+    %% Results are returned in fp
     ?assertEqual({ok, [ {column, <<"a">>, timestamp}], [
-        [{{0, 1, 1}, {0, 0, 0.0}}],
-        [{{1970, 8, 11}, {8, 0, 0.0}}]
+        [{{   0, 1,  1}, { 0,  0,  0.0}}],
+        [{{1970, 8, 11}, { 8,  0,  0.0}}],
+        [{{2022, 3, 19}, {22, 36, 23.983105}}]
     ]}, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
@@ -726,12 +734,16 @@ appender_append_timestamp_test() ->
     ok = educkdb:append_timestamp(Appender, {{2032, 4, 29}, {23, 59, 59}}),
     ok = educkdb:appender_end_row(Appender),
 
+    ok = educkdb:append_timestamp(Appender, {1647, 729383, 983105}),
+    ok = educkdb:appender_end_row(Appender),
+
     ok = educkdb:appender_flush(Appender),
 
     ?assertEqual({ok,[{column, <<"a">>, timestamp}],
                   [
                    [{{   0,  1,  1}, { 0,  0,  0.0}}],
                    [{{1901, 10, 10}, {10, 15,  0.0}}],
+                   [{{2022, 3, 19}, {22, 36, 23.983105}}],
                    [{{2032,  4, 29}, {23, 59, 59.0}}]
                   ]},
                  educkdb:squery(Conn, "select * from test order by a;")),
