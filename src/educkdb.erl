@@ -115,8 +115,10 @@
              ]).
 
 -define(SEC_TO_MICS(S), (S * 1000000)).
+-define(MIC_TO_SECS(S), (S / 1000000.0)).
 -define(MIN_TO_MICS(S), (S * 60000000)).
 -define(HOUR_TO_MICS(S), (S * 3600000000)).
+-define(EPOCH_OFFSET, 62167219200000000).
 
 -on_load(init/0).
 
@@ -289,10 +291,12 @@ bind_time_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc 
+bind_timestamp(Stmt, Index, {MegaSecs, Secs, MicroSecs}) ->
+    bind_timestamp_intern(Stmt, Index, ?EPOCH_OFFSET + ?SEC_TO_MICS(MegaSecs * 1000000) + ?SEC_TO_MICS(Secs) + MicroSecs);
 bind_timestamp(Stmt, Index, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
-    Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
-    RemMillies = floor(?SEC_TO_MICS(Second)),
-    bind_timestamp_intern(Stmt, Index, Millies + RemMillies);
+    Mics = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
+    RemMics = floor(?SEC_TO_MICS(Second)),
+    bind_timestamp_intern(Stmt, Index, Mics + RemMics);
 bind_timestamp(Stmt, Index, Micros) when is_integer(Micros) ->
     bind_timestamp_intern(Stmt, Index, Micros).
 
@@ -399,6 +403,8 @@ append_date_intern(_Appender, _Date) ->
 
 
 %% @doc 
+append_timestamp(Appender, {MegaSecs, Secs, MicroSecs}) ->
+    append_timestamp_intern(Appender, ?EPOCH_OFFSET + ?SEC_TO_MICS(MegaSecs * 1000000) + ?SEC_TO_MICS(Secs) + MicroSecs);
 append_timestamp(Appender, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
     Millies = ?SEC_TO_MICS(calendar:datetime_to_gregorian_seconds({Date, {Hour, Minute, 0}})),
     RemMillies = floor(?SEC_TO_MICS(Second)),
