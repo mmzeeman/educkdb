@@ -68,7 +68,9 @@
     append_varchar/2,
     append_null/1,
     appender_flush/1,
-    appender_end_row/1
+    appender_end_row/1,
+
+    test_fun/0
 ]).
 
 %% High Level Api
@@ -129,6 +131,10 @@ init() ->
                       Dir -> filename:join(Dir, NifName)
                   end,
     ok = erlang:load_nif(NifFileName, 0).
+
+
+test_fun() ->
+    erlang:nif_error(nif_library_not_loaded).
 
 %%
 %% Startup & Configure

@@ -46,7 +46,7 @@ educk_db_version_test() ->
 
     ?assertEqual({ok,
                   [{column, <<"library_version">>, varchar}, {column, <<"source_id">>, varchar}],
-                  [[<<"0.3.1">>, <<"88aa81c6b">>]]},
+                  [[<<"v0.3.3-dev1282">>,<<"a52157e01">>]]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -76,22 +76,7 @@ open_connect_and_disconnect_test() ->
     ok.
 
 open_options_test() ->
-    %% [note] newer duckdb versions can have new config flags.
-    InfoMap = #{access_mode => 
-                    <<"Access mode of the database ([AUTOMATIC], READ_ONLY or READ_WRITE)">>,
-                default_null_order =>
-                    <<"Null ordering used when none is specified ([NULLS_FIRST] or NULLS_LAST)">>,
-                default_order =>
-                    <<"The order type used when none is specified ([ASC] or DESC)">>,
-                enable_external_access =>
-                    <<"Allow the database to access external state (through e.g. COPY TO/FROM, CSV readers, pandas replacement scans, etc)">>,
-                enable_object_cache =>
-                    <<"Whether or not object cache is used to cache e.g. Parquet metadata">>,
-                max_memory =>
-                    <<"The maximum memory of the system (e.g. 1GB)">>,
-                threads =>
-                    <<"The number of total threads used by the system">>},
-    ?assertEqual(InfoMap, educkdb:config_flag_info()),
+    ?assert(is_map(educkdb:config_flag_info())),
 
     {ok, Db1} = educkdb:open(":memory:", #{threads => "2"}),
     ok = educkdb:close(Db1),
@@ -783,11 +768,6 @@ yielding_test() ->
 current_schema_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-
-    %% This returns an unkown error because the return type (a list) is not
-    %% something which can be returned. Somehow no error message is attached 
-    %% from the duckdb side. Could change in the future.
-    ?assertEqual({error, unknown}, educkdb:squery(Conn, "select current_schemas(true);")),
 
     %% FYI, the result must be unnested first.
     ?assertEqual( {ok,[{column,<<"current_schemas">>,varchar}],
