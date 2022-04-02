@@ -812,6 +812,21 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
             }
         case DUCKDB_TYPE_BLOB:
             return make_atom(env, "todo");
+
+        case DUCKDB_TYPE_DECIMAL:
+            return make_atom(env, "todo");
+
+        case DUCKDB_TYPE_TIMESTAMP_S:
+        case DUCKDB_TYPE_TIMESTAMP_MS:
+        case DUCKDB_TYPE_TIMESTAMP_NS:
+        case DUCKDB_TYPE_ENUM:
+        case DUCKDB_TYPE_LIST:
+        case DUCKDB_TYPE_STRUCT:
+        case DUCKDB_TYPE_MAP:  
+        case DUCKDB_TYPE_UUID:
+        case DUCKDB_TYPE_JSON:
+            return make_atom(env, "todo");
+
         default:
             return atom_error;
     }
