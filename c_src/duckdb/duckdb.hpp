@@ -10,8 +10,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #pragma once
 #define DUCKDB_AMALGAMATION 1
-#define DUCKDB_SOURCE_ID "a52157e01"
-#define DUCKDB_VERSION "v0.3.3-dev1282"
+#define DUCKDB_SOURCE_ID "7c5ba6c0e"
+#define DUCKDB_VERSION "v0.3.3-dev1399"
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
@@ -4320,25 +4320,12 @@ struct VectorOperations {
 	//===--------------------------------------------------------------------===//
 	// Nested Comparisons
 	//===--------------------------------------------------------------------===//
-	// true := A != B with nulls being equal, inputs selected
-	static idx_t NestedNotEquals(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel, idx_t count,
+	// true := A != B with nulls being equal
+	static idx_t NestedNotEquals(Vector &left, Vector &right, const SelectionVector &sel, idx_t count,
 	                             SelectionVector *true_sel, SelectionVector *false_sel);
-	// true := A == B with nulls being equal, inputs selected
-	static idx_t NestedEquals(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel, idx_t count,
+	// true := A == B with nulls being equal
+	static idx_t NestedEquals(Vector &left, Vector &right, const SelectionVector &sel, idx_t count,
 	                          SelectionVector *true_sel, SelectionVector *false_sel);
-
-	// true := A > B with nulls being maximal, inputs selected
-	static idx_t NestedGreaterThan(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel, idx_t count,
-	                               SelectionVector *true_sel, SelectionVector *false_sel);
-	// true := A >= B with nulls being maximal, inputs selected
-	static idx_t NestedGreaterThanEquals(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel,
-	                                     idx_t count, SelectionVector *true_sel, SelectionVector *false_sel);
-	// true := A < B with nulls being maximal, inputs selected
-	static idx_t NestedLessThan(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel, idx_t count,
-	                            SelectionVector *true_sel, SelectionVector *false_sel);
-	// true := A <= B with nulls being maximal, inputs selected
-	static idx_t NestedLessThanEquals(Vector &left, Vector &right, idx_t vcount, const SelectionVector &sel,
-	                                  idx_t count, SelectionVector *true_sel, SelectionVector *false_sel);
 
 	//===--------------------------------------------------------------------===//
 	// Hash functions
@@ -6475,7 +6462,8 @@ public:
 class BaseScalarFunction : public SimpleFunction {
 public:
 	DUCKDB_API BaseScalarFunction(string name, vector<LogicalType> arguments, LogicalType return_type,
-	                              bool has_side_effects, LogicalType varargs = LogicalType(LogicalTypeId::INVALID));
+	                              bool has_side_effects, LogicalType varargs = LogicalType(LogicalTypeId::INVALID),
+	                              bool propagates_null_values = false);
 	DUCKDB_API ~BaseScalarFunction() override;
 
 	//! Return type of the function
@@ -6483,6 +6471,8 @@ public:
 	//! Whether or not the function has side effects (e.g. sequence increments, random() functions, NOW()). Functions
 	//! with side-effects cannot be constant-folded.
 	bool has_side_effects;
+	//! Whether or not the function propagates null values
+	bool propagates_null_values;
 
 public:
 	DUCKDB_API hash_t Hash() const;
@@ -7242,12 +7232,13 @@ public:
 	                          scalar_function_t function, bool has_side_effects = false,
 	                          bind_scalar_function_t bind = nullptr, dependency_function_t dependency = nullptr,
 	                          function_statistics_t statistics = nullptr, init_local_state_t init_local_state = nullptr,
-	                          LogicalType varargs = LogicalType(LogicalTypeId::INVALID));
+	                          LogicalType varargs = LogicalType(LogicalTypeId::INVALID),
+	                          bool propagate_null_values = false);
 
 	DUCKDB_API ScalarFunction(vector<LogicalType> arguments, LogicalType return_type, scalar_function_t function,
-	                          bool has_side_effects = false, bind_scalar_function_t bind = nullptr,
-	                          dependency_function_t dependency = nullptr, function_statistics_t statistics = nullptr,
-	                          init_local_state_t init_local_state = nullptr,
+	                          bool propagate_null_values = false, bool has_side_effects = false,
+	                          bind_scalar_function_t bind = nullptr, dependency_function_t dependency = nullptr,
+	                          function_statistics_t statistics = nullptr, init_local_state_t init_local_state = nullptr,
 	                          LogicalType varargs = LogicalType(LogicalTypeId::INVALID));
 
 	//! The main scalar function to execute
@@ -8537,6 +8528,7 @@ public:
 	bool IsScalar() const override;
 	bool HasParameter() const override;
 	virtual bool HasSideEffects() const;
+	virtual bool PropagatesNullValues() const;
 	virtual bool IsFoldable() const;
 
 	hash_t Hash() const override;
@@ -8968,12 +8960,35 @@ public:
 	                             const LogicalType &return_type, aggregate_size_t state_size,
 	                             aggregate_initialize_t initialize, aggregate_update_t update,
 	                             aggregate_combine_t combine, aggregate_finalize_t finalize,
+	                             bool propagates_null_values = false, aggregate_simple_update_t simple_update = nullptr,
+	                             bind_aggregate_function_t bind = nullptr, aggregate_destructor_t destructor = nullptr,
+	                             aggregate_statistics_t statistics = nullptr, aggregate_window_t window = nullptr)
+	    : BaseScalarFunction(name, arguments, return_type, false, LogicalType(LogicalTypeId::INVALID),
+	                         propagates_null_values),
+	      state_size(state_size), initialize(initialize), update(update), combine(combine), finalize(finalize),
+	      simple_update(simple_update), window(window), bind(bind), destructor(destructor), statistics(statistics) {
+	}
+
+	DUCKDB_API AggregateFunction(const string &name, const vector<LogicalType> &arguments,
+	                             const LogicalType &return_type, aggregate_size_t state_size,
+	                             aggregate_initialize_t initialize, aggregate_update_t update,
+	                             aggregate_combine_t combine, aggregate_finalize_t finalize,
 	                             aggregate_simple_update_t simple_update = nullptr,
 	                             bind_aggregate_function_t bind = nullptr, aggregate_destructor_t destructor = nullptr,
 	                             aggregate_statistics_t statistics = nullptr, aggregate_window_t window = nullptr)
-	    : BaseScalarFunction(name, arguments, return_type, false), state_size(state_size), initialize(initialize),
-	      update(update), combine(combine), finalize(finalize), simple_update(simple_update), window(window),
-	      bind(bind), destructor(destructor), statistics(statistics) {
+	    : BaseScalarFunction(name, arguments, return_type, false, LogicalType(LogicalTypeId::INVALID), false),
+	      state_size(state_size), initialize(initialize), update(update), combine(combine), finalize(finalize),
+	      simple_update(simple_update), window(window), bind(bind), destructor(destructor), statistics(statistics) {
+	}
+
+	DUCKDB_API AggregateFunction(const vector<LogicalType> &arguments, const LogicalType &return_type,
+	                             aggregate_size_t state_size, aggregate_initialize_t initialize,
+	                             aggregate_update_t update, aggregate_combine_t combine, aggregate_finalize_t finalize,
+	                             bool propagates_null_values = false, aggregate_simple_update_t simple_update = nullptr,
+	                             bind_aggregate_function_t bind = nullptr, aggregate_destructor_t destructor = nullptr,
+	                             aggregate_statistics_t statistics = nullptr, aggregate_window_t window = nullptr)
+	    : AggregateFunction(string(), arguments, return_type, state_size, initialize, update, combine, finalize,
+	                        propagates_null_values, simple_update, bind, destructor, statistics, window) {
 	}
 
 	DUCKDB_API AggregateFunction(const vector<LogicalType> &arguments, const LogicalType &return_type,
@@ -8982,10 +8997,9 @@ public:
 	                             aggregate_simple_update_t simple_update = nullptr,
 	                             bind_aggregate_function_t bind = nullptr, aggregate_destructor_t destructor = nullptr,
 	                             aggregate_statistics_t statistics = nullptr, aggregate_window_t window = nullptr)
-	    : AggregateFunction(string(), arguments, return_type, state_size, initialize, update, combine, finalize,
+	    : AggregateFunction(string(), arguments, return_type, state_size, initialize, update, combine, finalize, false,
 	                        simple_update, bind, destructor, statistics, window) {
 	}
-
 	//! The hashed aggregate state sizing function
 	aggregate_size_t state_size;
 	//! The hashed aggregate state initialization function
@@ -9037,12 +9051,13 @@ public:
 	}
 
 	template <class STATE, class INPUT_TYPE, class RESULT_TYPE, class OP>
-	static AggregateFunction UnaryAggregate(const LogicalType &input_type, LogicalType return_type) {
+	static AggregateFunction UnaryAggregate(const LogicalType &input_type, LogicalType return_type,
+	                                        bool propagates_null_values = false) {
 		return AggregateFunction(
 		    {input_type}, return_type, AggregateFunction::StateSize<STATE>,
 		    AggregateFunction::StateInitialize<STATE, OP>, AggregateFunction::UnaryScatterUpdate<STATE, INPUT_TYPE, OP>,
 		    AggregateFunction::StateCombine<STATE, OP>, AggregateFunction::StateFinalize<STATE, RESULT_TYPE, OP>,
-		    AggregateFunction::UnaryUpdate<STATE, INPUT_TYPE, OP>);
+		    propagates_null_values, AggregateFunction::UnaryUpdate<STATE, INPUT_TYPE, OP>);
 	}
 
 	template <class STATE, class INPUT_TYPE, class RESULT_TYPE, class OP>
@@ -10156,6 +10171,12 @@ public:
 	}
 };
 
+class GlobalOperatorState {
+public:
+	virtual ~GlobalOperatorState() {
+	}
+};
+
 class GlobalSinkState {
 public:
 	GlobalSinkState() : state(SinkFinalizeType::READY) {
@@ -10209,6 +10230,8 @@ public:
 	idx_t estimated_cardinality;
 	//! The global sink state of this operator
 	unique_ptr<GlobalSinkState> sink_state;
+	//! The global state of this operator
+	unique_ptr<GlobalOperatorState> op_state;
 
 public:
 	virtual string GetName() const;
@@ -10230,8 +10253,9 @@ public:
 public:
 	// Operator interface
 	virtual unique_ptr<OperatorState> GetOperatorState(ClientContext &context) const;
+	virtual unique_ptr<GlobalOperatorState> GetGlobalOperatorState(ClientContext &context) const;
 	virtual OperatorResultType Execute(ExecutionContext &context, DataChunk &input, DataChunk &chunk,
-	                                   OperatorState &state) const;
+	                                   GlobalOperatorState &gstate, OperatorState &state) const;
 
 	virtual bool ParallelOperator() const {
 		return false;
@@ -10614,7 +10638,7 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
 	friend class PipelineFinishEvent;
 
 public:
-	Pipeline(Executor &execution_context);
+	explicit Pipeline(Executor &execution_context);
 
 	Executor &executor;
 
@@ -12145,6 +12169,7 @@ public:
 	bool IsFoldable() const override {
 		return false;
 	}
+	bool PropagatesNullValues() const override;
 
 	string ToString() const override;
 
@@ -12380,6 +12405,8 @@ public:
 
 	bool Equals(const BaseExpression *other) const override;
 
+	bool PropagatesNullValues() const override;
+
 	unique_ptr<Expression> Copy() override;
 };
 } // namespace duckdb
@@ -12489,7 +12516,7 @@ public:
 	bool HasSideEffects() const override;
 	bool IsFoldable() const override;
 	string ToString() const override;
-
+	bool PropagatesNullValues() const override;
 	hash_t Hash() const override;
 	bool Equals(const BaseExpression *other) const override;
 
@@ -13539,9 +13566,10 @@ private:
 private:
 	//! Bind the default values of the columns of a table
 	void BindDefaultValues(vector<ColumnDefinition> &columns, vector<unique_ptr<Expression>> &bound_defaults);
-	//! Bind a delimiter value (LIMIT or OFFSET)
-	unique_ptr<Expression> BindDelimiter(ClientContext &context, unique_ptr<ParsedExpression> delimiter,
-	                                     const LogicalType &type, Value &delimiter_value);
+	//! Bind a limit value (LIMIT or OFFSET)
+	unique_ptr<Expression> BindDelimiter(ClientContext &context, OrderBinder &order_binder,
+	                                     unique_ptr<ParsedExpression> delimiter, const LogicalType &type,
+	                                     Value &delimiter_value);
 
 	//! Move correlated expressions from the child binder to this binder
 	void MoveCorrelatedExpressions(Binder &other);
@@ -13602,10 +13630,6 @@ private:
 	unique_ptr<LogicalOperator> CreatePlan(BoundExpressionListRef &ref);
 	unique_ptr<LogicalOperator> CreatePlan(BoundCTERef &ref);
 
-	unique_ptr<LogicalOperator> BindTable(TableCatalogEntry &table, BaseTableRef &ref);
-	unique_ptr<LogicalOperator> BindView(ViewCatalogEntry &view, BaseTableRef &ref);
-	unique_ptr<LogicalOperator> BindTableOrView(BaseTableRef &ref);
-
 	BoundStatement BindCopyTo(CopyStatement &stmt);
 	BoundStatement BindCopyFrom(CopyStatement &stmt);
 
@@ -13613,8 +13637,8 @@ private:
 	void BindModifierTypes(BoundQueryNode &result, const vector<LogicalType> &sql_types, idx_t projection_index);
 
 	BoundStatement BindSummarize(ShowStatement &stmt);
-	unique_ptr<BoundResultModifier> BindLimit(LimitModifier &limit_mod);
-	unique_ptr<BoundResultModifier> BindLimitPercent(LimitPercentModifier &limit_mod);
+	unique_ptr<BoundResultModifier> BindLimit(OrderBinder &order_binder, LimitModifier &limit_mod);
+	unique_ptr<BoundResultModifier> BindLimitPercent(OrderBinder &order_binder, LimitPercentModifier &limit_mod);
 	unique_ptr<Expression> BindOrderExpression(OrderBinder &order_binder, unique_ptr<ParsedExpression> expr);
 
 	unique_ptr<LogicalOperator> PlanFilter(unique_ptr<Expression> condition, unique_ptr<LogicalOperator> root);
@@ -14037,6 +14061,8 @@ public:
 	bool Equals(const BaseExpression *other) const override;
 
 	unique_ptr<Expression> Copy() override;
+
+	bool PropagatesNullValues() const override;
 };
 } // namespace duckdb
 
@@ -14417,9 +14443,9 @@ struct ColumnFetchState {
 struct LocalScanState {
 	~LocalScanState();
 
-	void SetStorage(LocalTableStorage *storage);
+	void SetStorage(shared_ptr<LocalTableStorage> storage);
 	LocalTableStorage *GetStorage() {
-		return storage;
+		return storage.get();
 	}
 
 	idx_t chunk_index;
@@ -14428,7 +14454,7 @@ struct LocalScanState {
 	TableFilterSet *table_filters;
 
 private:
-	LocalTableStorage *storage = nullptr;
+	shared_ptr<LocalTableStorage> storage;
 };
 
 class RowGroupScanState {
@@ -14489,7 +14515,7 @@ class DataTable;
 class WriteAheadLog;
 struct TableAppendState;
 
-class LocalTableStorage {
+class LocalTableStorage : public std::enable_shared_from_this<LocalTableStorage> {
 public:
 	explicit LocalTableStorage(DataTable &table);
 	~LocalTableStorage();
@@ -14572,7 +14598,7 @@ private:
 
 private:
 	Transaction &transaction;
-	unordered_map<DataTable *, unique_ptr<LocalTableStorage>> table_storage;
+	unordered_map<DataTable *, shared_ptr<LocalTableStorage>> table_storage;
 
 	void Flush(DataTable &table, LocalTableStorage &storage);
 };
@@ -15869,12 +15895,21 @@ Destroys the value and de-allocates all memory allocated for that type.
 DUCKDB_API void duckdb_destroy_value(duckdb_value *value);
 
 /*!
-Creates a value from a varchar
+Creates a value from a null-terminated string
 
-* value: The varchar value
+* value: The null-terminated string
 * returns: The value. This must be destroyed with `duckdb_destroy_value`.
 */
 DUCKDB_API duckdb_value duckdb_create_varchar(const char *text);
+
+/*!
+Creates a value from a string
+
+* value: The text
+* length: The length of the text
+* returns: The value. This must be destroyed with `duckdb_destroy_value`.
+*/
+DUCKDB_API duckdb_value duckdb_create_varchar_length(const char *text, idx_t length);
 
 /*!
 Creates a value from an int64

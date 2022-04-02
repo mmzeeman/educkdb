@@ -46,7 +46,7 @@ educk_db_version_test() ->
 
     ?assertEqual({ok,
                   [{column, <<"library_version">>, varchar}, {column, <<"source_id">>, varchar}],
-                  [[<<"v0.3.3-dev1282">>,<<"a52157e01">>]]},
+                  [[<<"v0.3.3-dev1399">>,<<"7c5ba6c0e">>]]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),

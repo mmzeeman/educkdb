@@ -41,6 +41,7 @@
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
+// static ErlNifResourceType *educkdb_data_chunk_type = NULL;
 static ErlNifResourceType *educkdb_prepared_statement_type = NULL;
 static ErlNifResourceType *educkdb_appender_type = NULL;
 
@@ -65,6 +66,12 @@ typedef struct {
 typedef struct {
     duckdb_result result;
 } educkdb_result;
+
+/*
+typedef struct {
+    duckdb_data_chunk data_chunk;
+} educkdb_data_chunk;
+*/
 
 typedef struct {
     educkdb_connection *connection;
@@ -235,11 +242,25 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
 /*
  * Destroy a materialized result
  */
+
 static void
 destruct_educkdb_result(ErlNifEnv *env, void *arg) {
     educkdb_result *res = (educkdb_result *) arg;
     duckdb_destroy_result(&(res->result));
 }
+
+/*
+ *
+ */
+
+/*
+static void
+destruct_educkdb_data_chunk(ErlNifEnv *env, void *arg) {
+    educkdb_data_chunk *chunk = (educkdb_data_chunk *) arg;
+    duckdb_destroy_data_chunk(&(chunk->data_chunk));
+}
+*/
+
 
 static void
 destruct_educkdb_prepared_statement(ErlNifEnv *env, void *arg) {
@@ -884,7 +905,6 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
 
     return enif_make_tuple3(env, atom_ok, argv[1], rows);
 }
-
 
 static ERL_NIF_TERM
 educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -2101,6 +2121,13 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_result_type) return -1;
 
+    /*
+    educkdb_data_chunk_type = enif_open_resource_type(env, NIF_NAME,
+            "educkdb_data_chunk", destruct_educkdb_data_chunk,
+            ERL_NIF_RT_CREATE, NULL);
+    if(!educkdb_data_chunk_type) return -1;
+    */
+
     educkdb_prepared_statement_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_prepared_statement_type", destruct_educkdb_prepared_statement,
             ERL_NIF_RT_CREATE, NULL);
@@ -2139,12 +2166,14 @@ static ErlNifFunc nif_funcs[] = {
 
     {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
-
     {"query_cmd", 2, educkdb_query_cmd},
-    {"extract_result", 1, educkdb_extract_result},
 
     {"prepare", 2, educkdb_prepare},
     {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
+
+    {"extract_result", 1, educkdb_extract_result},
+
+    // {"get_chunk", 2, educkdb_result_get_chunk},
 
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},
