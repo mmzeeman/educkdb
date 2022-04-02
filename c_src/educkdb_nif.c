@@ -290,25 +290,35 @@ destruct_educkdb_appender(ErlNifEnv *env, void *arg) {
 static const char*
 duckdb_type_name(duckdb_type t) {
     switch(t) {
-        case DUCKDB_TYPE_INVALID:   return "invalid";
-        case DUCKDB_TYPE_BOOLEAN:   return "boolean";
-        case DUCKDB_TYPE_TINYINT:   return "tinyint";
-        case DUCKDB_TYPE_SMALLINT:  return "smallint";
-        case DUCKDB_TYPE_INTEGER:   return "integer";
-        case DUCKDB_TYPE_BIGINT:    return "bigint";
-        case DUCKDB_TYPE_UTINYINT:  return "utinyint";
-        case DUCKDB_TYPE_USMALLINT: return "usmallint";
-        case DUCKDB_TYPE_UINTEGER:  return "uinteger";
-        case DUCKDB_TYPE_UBIGINT:   return "ubigint";
-        case DUCKDB_TYPE_FLOAT:     return "float";
-        case DUCKDB_TYPE_DOUBLE:    return "double";
-        case DUCKDB_TYPE_TIMESTAMP: return "timestamp";
-        case DUCKDB_TYPE_DATE:      return "date";
-        case DUCKDB_TYPE_TIME:      return "time";
-        case DUCKDB_TYPE_INTERVAL:  return "interval";
-        case DUCKDB_TYPE_HUGEINT:   return "hugeint";
-        case DUCKDB_TYPE_VARCHAR:   return "varchar";
-        case DUCKDB_TYPE_BLOB:      return "blob";
+        case DUCKDB_TYPE_INVALID:      return "invalid";
+        case DUCKDB_TYPE_BOOLEAN:      return "boolean";
+        case DUCKDB_TYPE_TINYINT:      return "tinyint";
+        case DUCKDB_TYPE_SMALLINT:     return "smallint";
+        case DUCKDB_TYPE_INTEGER:      return "integer";
+        case DUCKDB_TYPE_BIGINT:       return "bigint";
+        case DUCKDB_TYPE_UTINYINT:     return "utinyint";
+        case DUCKDB_TYPE_USMALLINT:    return "usmallint";
+        case DUCKDB_TYPE_UINTEGER:     return "uinteger";
+        case DUCKDB_TYPE_UBIGINT:      return "ubigint";
+        case DUCKDB_TYPE_FLOAT:        return "float";
+        case DUCKDB_TYPE_DOUBLE:       return "double";
+        case DUCKDB_TYPE_TIMESTAMP:    return "timestamp";
+        case DUCKDB_TYPE_DATE:         return "date";
+        case DUCKDB_TYPE_TIME:         return "time";
+        case DUCKDB_TYPE_INTERVAL:     return "interval";
+        case DUCKDB_TYPE_HUGEINT:      return "hugeint";
+        case DUCKDB_TYPE_VARCHAR:      return "varchar";
+        case DUCKDB_TYPE_BLOB:         return "blob";
+        case DUCKDB_TYPE_DECIMAL:      return "decimal";
+        case DUCKDB_TYPE_TIMESTAMP_S:  return "timestamp_s";
+        case DUCKDB_TYPE_TIMESTAMP_MS: return "timestamp_ms";
+        case DUCKDB_TYPE_TIMESTAMP_NS: return "timestamp_ns";
+        case DUCKDB_TYPE_ENUM:         return "enum";
+        case DUCKDB_TYPE_LIST:         return "list";
+        case DUCKDB_TYPE_STRUCT:       return "struct";
+        case DUCKDB_TYPE_MAP:          return "map";
+        case DUCKDB_TYPE_UUID:         return "uuid";
+        case DUCKDB_TYPE_JSON:         return "json";
     }
 }
 
