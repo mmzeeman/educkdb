@@ -739,9 +739,9 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
         case DUCKDB_TYPE_BOOLEAN:
             if(duckdb_value_boolean(result, col, row)) {
                 return atom_true;
-            } else {
-                return atom_false;
-            };
+            } 
+
+            return atom_false;
         case DUCKDB_TYPE_TINYINT:
         case DUCKDB_TYPE_SMALLINT:
         case DUCKDB_TYPE_INTEGER:
