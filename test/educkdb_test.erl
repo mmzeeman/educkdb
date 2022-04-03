@@ -46,7 +46,7 @@ educk_db_version_test() ->
 
     ?assertEqual({ok,
                   [{column, <<"library_version">>, varchar}, {column, <<"source_id">>, varchar}],
-                  [[<<"v0.3.3-dev1399">>,<<"7c5ba6c0e">>]]},
+                  [[<<"v0.3.3-dev1409">>,<<"6ac91ddc1">>]]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -90,6 +90,7 @@ open_options_test() ->
 
     ok.
 
+
 query_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -114,12 +115,48 @@ query_test() ->
     ok = educkdb:close(Db),
     ok.
 
+chunk_count_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
+    0 = educkdb:chunk_count(Res),
+
+    {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
+    1 = educkdb:chunk_count(Res1),
+
+    {ok, Res2} = educkdb:query(Conn, "select * from test;"),
+    1 = educkdb:chunk_count(Res2),
+
+    ok.
+
+get_chunk_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
+    0 = educkdb:chunk_count(Res),
+
+    {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
+    {ok, Chunk1} = educkdb:get_chunk(Res1, 0),
+    ?assert(is_reference(Chunk1)),
+
+    %{ok, Res2} = educkdb:query(Conn, "select * from test;"),
+    %{ok, Chunk2} = educkdb:get_chunk(Res2, 0),
+    %?assert(is_reference(Chunk2)),
+
+    ok.
+
+
+
 prepare_error_test() ->
     Query = "this is a syntax error;",
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {error, {prepare, _}} = educkdb:prepare(Conn, Query),
     ok.
+
+
 
 prepare_test() ->
     {ok, Db} = educkdb:open(":memory:"),

@@ -41,7 +41,7 @@
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
-// static ErlNifResourceType *educkdb_data_chunk_type = NULL;
+static ErlNifResourceType *educkdb_data_chunk_type = NULL;
 static ErlNifResourceType *educkdb_prepared_statement_type = NULL;
 static ErlNifResourceType *educkdb_appender_type = NULL;
 
@@ -67,11 +67,9 @@ typedef struct {
     duckdb_result result;
 } educkdb_result;
 
-/*
 typedef struct {
     duckdb_data_chunk data_chunk;
 } educkdb_data_chunk;
-*/
 
 typedef struct {
     educkdb_connection *connection;
@@ -249,17 +247,15 @@ destruct_educkdb_result(ErlNifEnv *env, void *arg) {
     duckdb_destroy_result(&(res->result));
 }
 
-/*
- *
- */
-
-/*
 static void
 destruct_educkdb_data_chunk(ErlNifEnv *env, void *arg) {
     educkdb_data_chunk *chunk = (educkdb_data_chunk *) arg;
-    duckdb_destroy_data_chunk(&(chunk->data_chunk));
+
+    if(chunk->data_chunk) {
+        duckdb_destroy_data_chunk(&(chunk->data_chunk));
+        chunk->data_chunk = NULL;
+    }
 }
-*/
 
 
 static void
@@ -799,23 +795,19 @@ make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
         case DUCKDB_TYPE_VARCHAR:
             {
                 char *value = duckdb_value_varchar(result, col, row);
-                if(value != NULL) {
-                    ERL_NIF_TERM value_binary;
-                    value_binary = make_binary(env, value, strlen(value));
-                    if(value_binary == atom_error) {
-                        // [todo] handle error 
-                    }
-                    duckdb_free(value);
-                    value = NULL;
-                    return value_binary;
+                if(value == NULL) {
+                    return atom_null;
                 }
+
+                ERL_NIF_TERM value_binary;
+                value_binary = make_binary(env, value, strlen(value));
+                duckdb_free(value);
+                return value_binary;
             }
         case DUCKDB_TYPE_BLOB:
             return make_atom(env, "todo");
 
         case DUCKDB_TYPE_DECIMAL:
-            return make_atom(env, "todo");
-
         case DUCKDB_TYPE_TIMESTAMP_S:
         case DUCKDB_TYPE_TIMESTAMP_MS:
         case DUCKDB_TYPE_TIMESTAMP_NS:
@@ -1002,6 +994,68 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     return educkdb_yield_extract_result(env, 6, new_args);
 }
+
+/**
+ * Chunks
+ */
+
+static ERL_NIF_TERM
+educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    ErlNifUInt64 index;
+    duckdb_data_chunk chunk;
+    educkdb_data_chunk *echunk;
+    ERL_NIF_TERM rchunk;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    chunk = duckdb_result_get_chunk(res->result, index);
+    if(chunk == NULL) {
+        return enif_make_tuple2(env, atom_error, atom_null);
+    }
+
+    echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
+    if(!echunk) {
+        duckdb_destroy_data_chunk(chunk);
+        return make_error_tuple(env, "no_memory");
+    }
+
+    echunk->data_chunk = chunk;
+    rchunk = enif_make_resource(env, echunk);
+    enif_release_resource(echunk);
+
+    fprintf(stderr, "return chunk tuple\n");
+
+    return make_ok_tuple(env, rchunk);
+}
+
+static ERL_NIF_TERM
+educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    idx_t count;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    count = duckdb_result_chunk_count(res->result);
+    return enif_make_uint64(env, count);
+}
+
 
 /*
  * Prepared Statements.
@@ -2146,12 +2200,10 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_result_type) return -1;
 
-    /*
     educkdb_data_chunk_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_data_chunk", destruct_educkdb_data_chunk,
             ERL_NIF_RT_CREATE, NULL);
     if(!educkdb_data_chunk_type) return -1;
-    */
 
     educkdb_prepared_statement_type = enif_open_resource_type(env, NIF_NAME,
             "educkdb_prepared_statement_type", destruct_educkdb_prepared_statement,
@@ -2198,7 +2250,8 @@ static ErlNifFunc nif_funcs[] = {
 
     {"extract_result", 1, educkdb_extract_result},
 
-    // {"get_chunk", 2, educkdb_result_get_chunk},
+    {"get_chunk", 2, educkdb_get_chunk},
+    {"chunk_count", 1, educkdb_chunk_count},
 
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},

@@ -50,6 +50,9 @@
 
     extract_result/1,
 
+    get_chunk/2,
+    chunk_count/1,
+
     appender_create/3,
     append_boolean/2,
     append_int8/2,
@@ -68,9 +71,7 @@
     append_varchar/2,
     append_null/1,
     appender_flush/1,
-    appender_end_row/1,
-
-    test_fun/0
+    appender_end_row/1
 ]).
 
 %% High Level Api
@@ -90,6 +91,7 @@
 -type prepared_statement() :: reference().
 -type result() :: reference().
 -type appender() :: reference().
+-type chunk() :: reference().
 
 -type sql() :: iodata(). 
 
@@ -132,9 +134,6 @@ init() ->
                   end,
     ok = erlang:load_nif(NifFileName, 0).
 
-
-test_fun() ->
-    erlang:nif_error(nif_library_not_loaded).
 
 %%
 %% Startup & Configure
@@ -329,6 +328,19 @@ bind_null(_Stmt, _Index) ->
 extract_result(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
     
+
+%%
+%% Chunks
+%%
+
+-spec get_chunk(result(), uint64()) -> chunk(). 
+get_chunk(_Result, _ChunkIndex) -> 
+    erlang:nif_error(nif_library_not_loaded).
+ 
+
+-spec chunk_count(result()) -> uint64().
+chunk_count(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
 
 %%
 %% Appender Interface
