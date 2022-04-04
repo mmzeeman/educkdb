@@ -898,8 +898,7 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
             pct = 100;
         } else if (pct == 0) {
             pct = 1;
-        } else {
-        }
+        } 
 
         /* Adjust the row_chunk_size when needed */
         if(pct < 20) {
@@ -995,9 +994,79 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return educkdb_yield_extract_result(env, 6, new_args);
 }
 
+
+static ERL_NIF_TERM
+extract_column_info(ErlNifEnv *env, ERL_NIF_TERM list, duckdb_data_chunk chunk) {
+    idx_t column_count = duckdb_data_chunk_get_column_count(chunk);
+
+
+    for(idx_t c=column_count; c-- > 0; ) {
+    }
+
+
+}
+
+/*
+ * Extract result, chunk version 
+ */
+static ERL_NIF_TERM
+educkdb_extract_result2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    idx_t chunk_count;
+
+    ERL_NIF_TERM column_info;
+    ERL_NIF_TERM rows;
+
+    duckdb_data_chunk chunk;
+
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    column_info = enif_make_list(env, 0);
+    rows = enif_make_list(env, 0);
+
+    chunk_count = duckdb_result_chunk_count(res->result);
+
+    if(chunk_count == 0) {
+        return enif_make_tuple3(env, atom_ok, column_info, rows);
+    }
+
+    chunk = duckdb_result_get_chunk(res->result, 0);
+    if(chunk == NULL) {
+        return enif_make_tuple3(env, atom_ok, column_info, rows);
+    }
+
+    column_info = extract_column_info(env, column_info, chunk);
+
+
+}
+
 /**
  * Chunks
  */
+
+static ERL_NIF_TERM
+educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    idx_t count;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    count = duckdb_result_chunk_count(res->result);
+    return enif_make_uint64(env, count);
+}
 
 static ERL_NIF_TERM
 educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1034,26 +1103,43 @@ educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     rchunk = enif_make_resource(env, echunk);
     enif_release_resource(echunk);
 
-    fprintf(stderr, "return chunk tuple\n");
-
     return make_ok_tuple(env, rchunk);
 }
 
 static ERL_NIF_TERM
-educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
+educkdb_chunk_get_column_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_data_chunk *chunk;
     idx_t count;
 
     if(argc != 1) {
         return enif_make_badarg(env);
     }
 
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+    if(!enif_get_resource(env, argv[0], educkdb_data_chunk_type, (void **) &chunk)) {
         return enif_make_badarg(env);
     }
 
-    count = duckdb_result_chunk_count(res->result);
+    count = duckdb_data_chunk_get_column_count(chunk->data_chunk);
+
     return enif_make_uint64(env, count);
+}
+
+static ERL_NIF_TERM
+educkdb_chunk_get_size(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_data_chunk *chunk;
+    idx_t size;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_data_chunk_type, (void **) &chunk)) {
+        return enif_make_badarg(env);
+    }
+
+    size = duckdb_data_chunk_get_size(chunk->data_chunk);
+
+    return enif_make_uint64(env, size);
 }
 
 
@@ -2249,9 +2335,12 @@ static ErlNifFunc nif_funcs[] = {
     {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
 
     {"extract_result", 1, educkdb_extract_result},
+    {"extract_result2", 1, educkdb_extract_result2},
 
-    {"get_chunk", 2, educkdb_get_chunk},
     {"chunk_count", 1, educkdb_chunk_count},
+    {"get_chunk", 2, educkdb_get_chunk},
+    {"chunk_get_column_count", 1, educkdb_chunk_get_column_count},
+    {"chunk_get_size", 1, educkdb_chunk_get_size},
 
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},

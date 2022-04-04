@@ -52,6 +52,9 @@
 
     get_chunk/2,
     chunk_count/1,
+    chunk_get_column_count/1,
+    chunk_get_size/1,
+
 
     appender_create/3,
     append_boolean/2,
@@ -91,7 +94,7 @@
 -type prepared_statement() :: reference().
 -type result() :: reference().
 -type appender() :: reference().
--type chunk() :: reference().
+-type data_chunk() :: reference().
 
 -type sql() :: iodata(). 
 
@@ -333,13 +336,22 @@ extract_result(_Result) ->
 %% Chunks
 %%
 
--spec get_chunk(result(), uint64()) -> chunk(). 
+-spec get_chunk(result(), uint64()) -> data_chunk(). 
 get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
  
 
 -spec chunk_count(result()) -> uint64().
 chunk_count(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+
+-spec chunk_get_column_count(data_chunk()) -> uint64().
+chunk_get_column_count(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec chunk_get_size(data_chunk()) -> uint64().
+chunk_get_size(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%

@@ -130,7 +130,7 @@ chunk_count_test() ->
 
     ok.
 
-get_chunk_test() ->
+chunk_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
@@ -140,10 +140,14 @@ get_chunk_test() ->
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     {ok, Chunk1} = educkdb:get_chunk(Res1, 0),
     ?assert(is_reference(Chunk1)),
+    ?assertEqual(1, educkdb:chunk_get_column_count(Chunk1)),
+    ?assertEqual(1, educkdb:chunk_get_size(Chunk1)),
 
-    %{ok, Res2} = educkdb:query(Conn, "select * from test;"),
-    %{ok, Chunk2} = educkdb:get_chunk(Res2, 0),
-    %?assert(is_reference(Chunk2)),
+    {ok, Res2} = educkdb:query(Conn, "select * from test;"),
+    {ok, Chunk2} = educkdb:get_chunk(Res2, 0),
+    ?assert(is_reference(Chunk2)),
+    ?assertEqual(1, educkdb:chunk_get_column_count(Chunk2)),
+    ?assertEqual(3, educkdb:chunk_get_size(Chunk2)),
 
     ok.
 
