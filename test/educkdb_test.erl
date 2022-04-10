@@ -866,6 +866,15 @@ extract2_test() ->
             ]},
        educkdb:extract_result2(R2)),
 
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"a">>,
+                 type => integer,
+                 data => [10, 11, 12] }
+            ]},
+       educkdb:extract_result2(R3)),
+
+
     ok.
 
 

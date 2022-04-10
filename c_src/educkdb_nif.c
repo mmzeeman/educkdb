@@ -38,6 +38,7 @@
 
 #define NIF_NAME "educkdb_nif"
 
+
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
@@ -259,7 +260,6 @@ destruct_educkdb_data_chunk(ErlNifEnv *env, void *arg) {
         chunk->data_chunk = NULL;
     }
 }
-
 
 static void
 destruct_educkdb_prepared_statement(ErlNifEnv *env, void *arg) {
@@ -1008,28 +1008,168 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
  * Extract result, chunk version 
  */
 
-
 static ERL_NIF_TERM
-extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tuple_count) {
+extract_data_boolean(ErlNifEnv *env, bool *vector_data, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
-    void *d = duckdb_vector_get_data(vector);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
         ERL_NIF_TERM cell;
 
-        switch(type_id) {
-            case DUCKDB_TYPE_BIGINT:
-                // int64_t *di = (int64_t *) d; 
-                cell = enif_make_int64(env,  *(((int64_t *) d) + i));
-                break;
-            default:
-                cell = atom_true;
+        if(*(vector_data + i)) {
+            cell = atom_true;
+        } else {
+            cell = atom_false;
         }
 
         data = enif_make_list_cell(env, cell, data);
     }
 
     return data;
+}
+
+static ERL_NIF_TERM
+extract_data_utinyint(ErlNifEnv *env, uint8_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_uint(env, *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_usmallint(ErlNifEnv *env, uint16_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_uint(env, *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_uinteger(ErlNifEnv *env, uint32_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_uint(env, *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_ubigint(ErlNifEnv *env, uint64_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_uint64(env, *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_tinyint(ErlNifEnv *env, int8_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_int(env, *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+
+
+static ERL_NIF_TERM
+extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_int(env,  *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+
+static ERL_NIF_TERM
+extract_data_integer(ErlNifEnv *env, int32_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_int(env,  *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = enif_make_int64(env,  *(vector_data + i));
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell = atom_null;
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tuple_count) {
+    void *data = duckdb_vector_get_data(vector);
+
+    switch(type_id) {
+        case DUCKDB_TYPE_BOOLEAN:
+            return extract_data_boolean(env, (bool *) data, tuple_count);
+
+        // Signed Integers
+        case DUCKDB_TYPE_TINYINT:
+            return extract_data_tinyint(env, (int8_t *) data, tuple_count);
+        case DUCKDB_TYPE_SMALLINT:
+            return extract_data_smallint(env, (int16_t *) data, tuple_count);
+        case DUCKDB_TYPE_INTEGER:
+            return extract_data_integer(env, (int32_t *) data, tuple_count);
+        case DUCKDB_TYPE_BIGINT:
+            return extract_data_bigint(env, (int64_t *) data, tuple_count);
+
+        // Unsigned Integers
+        case DUCKDB_TYPE_UTINYINT:
+            return extract_data_utinyint(env, (uint8_t *) data, tuple_count);
+        case DUCKDB_TYPE_USMALLINT:
+            return extract_data_usmallint(env, (uint16_t *) data, tuple_count);
+        case DUCKDB_TYPE_UINTEGER:
+            return extract_data_uinteger(env, (uint32_t *) data, tuple_count);
+        case DUCKDB_TYPE_UBIGINT:
+            return extract_data_ubigint(env, (uint64_t *) data, tuple_count);
+
+
+        default:
+            return extract_data_todo(env, tuple_count);
+    }
 }
 
 static ERL_NIF_TERM
