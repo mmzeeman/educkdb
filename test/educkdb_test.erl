@@ -46,7 +46,7 @@ educk_db_version_test() ->
 
     ?assertEqual({ok,
                   [{column, <<"library_version">>, varchar}, {column, <<"source_id">>, varchar}],
-                  [[<<"v0.3.3-dev1409">>,<<"6ac91ddc1">>]]},
+                  [[<<"v0.3.3-dev1506">>,<<"c49d6b432">>]]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -151,16 +151,12 @@ chunk_test() ->
 
     ok.
 
-
-
 prepare_error_test() ->
     Query = "this is a syntax error;",
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {error, {prepare, _}} = educkdb:prepare(Conn, Query),
     ok.
-
-
 
 prepare_test() ->
     {ok, Db} = educkdb:open(":memory:"),
@@ -849,6 +845,26 @@ garbage_collect_test() ->
     [spawn(F) || _X <- lists:seq(0,30)],
     receive after 500 -> ok end,
     erlang:garbage_collect(),
+
+    ok.
+
+extract2_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a integer);"),
+    ?assertEqual(
+       {ok, [ ]},
+       educkdb:extract_result2(R1)
+      ),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"Count">>,
+                 type => bigint,
+                 data => [3] }
+            ]},
+       educkdb:extract_result2(R2)),
 
     ok.
 

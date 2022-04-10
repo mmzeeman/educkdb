@@ -10,8 +10,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #pragma once
 #define DUCKDB_AMALGAMATION 1
-#define DUCKDB_SOURCE_ID "6ac91ddc1"
-#define DUCKDB_VERSION "v0.3.3-dev1409"
+#define DUCKDB_SOURCE_ID "c49d6b432"
+#define DUCKDB_VERSION "v0.3.3-dev1506"
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
@@ -1241,9 +1241,10 @@ enum class ExceptionFormatValueType : uint8_t {
 };
 
 struct ExceptionFormatValue {
-	DUCKDB_API ExceptionFormatValue(double dbl_val);  // NOLINT
-	DUCKDB_API ExceptionFormatValue(int64_t int_val); // NOLINT
-	DUCKDB_API ExceptionFormatValue(string str_val);  // NOLINT
+	DUCKDB_API ExceptionFormatValue(double dbl_val);   // NOLINT
+	DUCKDB_API ExceptionFormatValue(int64_t int_val);  // NOLINT
+	DUCKDB_API ExceptionFormatValue(string str_val);   // NOLINT
+	DUCKDB_API ExceptionFormatValue(hugeint_t hg_val); // NOLINT
 
 	ExceptionFormatValueType type;
 
@@ -1273,6 +1274,8 @@ template <>
 DUCKDB_API ExceptionFormatValue ExceptionFormatValue::CreateFormatValue(const char *value);
 template <>
 DUCKDB_API ExceptionFormatValue ExceptionFormatValue::CreateFormatValue(char *value);
+template <>
+DUCKDB_API ExceptionFormatValue ExceptionFormatValue::CreateFormatValue(hugeint_t value);
 
 } // namespace duckdb
 

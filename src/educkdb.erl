@@ -49,6 +49,7 @@
     bind_null/2,
 
     extract_result/1,
+    extract_result2/1,
 
     get_chunk/2,
     chunk_count/1,
@@ -331,6 +332,9 @@ bind_null(_Stmt, _Index) ->
 extract_result(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
     
+extract_result2(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
+ 
 
 %%
 %% Chunks

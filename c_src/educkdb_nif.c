@@ -104,6 +104,9 @@ static ERL_NIF_TERM atom_column;
 static ERL_NIF_TERM atom_null;
 static ERL_NIF_TERM atom_true;
 static ERL_NIF_TERM atom_false;
+static ERL_NIF_TERM atom_type;
+static ERL_NIF_TERM atom_data;
+static ERL_NIF_TERM atom_name;
 
 static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
@@ -837,6 +840,31 @@ max_idx(idx_t a, idx_t b) {
 }
 
 static ERL_NIF_TERM
+make_column_info(ErlNifEnv *env, duckdb_result *result) {
+    idx_t row_count = duckdb_row_count(result);
+    idx_t column_count = duckdb_column_count(result);
+    ERL_NIF_TERM column_info = enif_make_list(env, 0);
+
+
+    /* The row count can be 0, while the column_info still contains data, so we 
+     * have to prevent to return column info when there are no rows.
+     **/
+    if(row_count > 0) {
+        for(idx_t c=column_count; c-- > 0; ) {
+            const char *column_name = duckdb_column_name(result, c);
+            ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
+            const char *column_type_name = duckdb_type_name(duckdb_column_type(result, c));
+            ERL_NIF_TERM type_atom = make_atom(env, column_type_name);
+            ERL_NIF_TERM column_info_tuple = enif_make_tuple3(env, atom_column, name_binary, type_atom);
+
+            column_info = enif_make_list_cell(env, column_info_tuple, column_info);
+        }
+    }
+
+    return column_info;
+}
+
+static ERL_NIF_TERM
 educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
     ERL_NIF_TERM rows, row, cell;
@@ -925,17 +953,11 @@ educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
 static ERL_NIF_TERM
 educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
-    idx_t c;
     idx_t row_count, column_count;
-    const char *column_name;
-    const char *column_type_name;
 
     ERL_NIF_TERM column_info;
-    ERL_NIF_TERM column_info_tuple;
     ERL_NIF_TERM rows;
 
-    ERL_NIF_TERM type_atom;
-    ERL_NIF_TERM name_binary;
 
     if(argc != 1) {
         return enif_make_badarg(env);
@@ -956,20 +978,7 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     /* The row count can be 0, while the column_info still contains data, so we 
      * have to prevent to return column info when there are no rows.
      **/
-    column_info = enif_make_list(env, 0);
-    if(row_count > 0) {
-        for(c=column_count; c-- > 0; ) {
-            column_name = duckdb_column_name(&(res->result), c);
-            name_binary = make_binary(env, column_name, strlen(column_name));
-            column_type_name = duckdb_type_name(duckdb_column_type(&(res->result), c));
-            type_atom = make_atom(env, column_type_name);
-
-            column_info_tuple = enif_make_tuple3(env, atom_column, name_binary, type_atom);
-            column_info = enif_make_list_cell(env, column_info_tuple, column_info);
-        }
-    }
-    
-    /* Rows */
+    column_info = make_column_info(env, &(res->result));
     rows = enif_make_list(env, 0);
     if(row_count == 0) {
         return enif_make_tuple3(env, atom_ok, column_info, rows);
@@ -995,30 +1004,77 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 
-static ERL_NIF_TERM
-extract_column_info(ErlNifEnv *env, ERL_NIF_TERM list, duckdb_data_chunk chunk) {
-    idx_t column_count = duckdb_data_chunk_get_column_count(chunk);
-
-
-    for(idx_t c=column_count; c-- > 0; ) {
-    }
-
-
-}
-
 /*
  * Extract result, chunk version 
  */
+
+
+static ERL_NIF_TERM
+extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+    void *d = duckdb_vector_get_data(vector);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+
+        switch(type_id) {
+            case DUCKDB_TYPE_BIGINT:
+                // int64_t *di = (int64_t *) d; 
+                cell = enif_make_int64(env,  *(((int64_t *) d) + i));
+                break;
+            default:
+                cell = atom_true;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_vector(ErlNifEnv *env, duckdb_vector vector, idx_t tuple_count) {
+    ERL_NIF_TERM vector_map = enif_make_new_map(env);
+    duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
+
+    // Type
+    duckdb_type type_id = duckdb_get_type_id(logical_type);
+    const char *type_name = duckdb_type_name(type_id);
+    ERL_NIF_TERM type_atom = make_atom(env, type_name);
+    if(enif_make_map_put(env, vector_map, atom_type, type_atom, &vector_map)) { }
+
+    // Data
+    ERL_NIF_TERM data = extract_data(env, type_id, vector, tuple_count);
+    if(enif_make_map_put(env, vector_map, atom_data, data, &vector_map)) { }
+
+    duckdb_destroy_logical_type(&logical_type);
+
+    return vector_map;
+}
+
+static ERL_NIF_TERM
+extract_chunk(ErlNifEnv *env, duckdb_result *result, duckdb_data_chunk chunk, idx_t column_count, idx_t tuple_count) {
+    ERL_NIF_TERM column[column_count];
+
+    for(idx_t i=0; i < column_count; i++) {
+        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, i);
+        ERL_NIF_TERM vector_map = extract_vector(env, vector, tuple_count);  
+
+        // Add the column name
+        const char *column_name = duckdb_column_name(result, i);
+        ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
+        if(enif_make_map_put(env, vector_map, atom_name, name_binary, &vector_map)) { }
+
+        column[i] = vector_map;
+    }
+
+    return enif_make_list_from_array(env, column, column_count); 
+} 
+
 static ERL_NIF_TERM
 educkdb_extract_result2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
     idx_t chunk_count;
-
-    ERL_NIF_TERM column_info;
-    ERL_NIF_TERM rows;
-
-    duckdb_data_chunk chunk;
-
 
     if(argc != 1) {
         return enif_make_badarg(env);
@@ -1028,23 +1084,20 @@ educkdb_extract_result2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    column_info = enif_make_list(env, 0);
-    rows = enif_make_list(env, 0);
-
     chunk_count = duckdb_result_chunk_count(res->result);
-
     if(chunk_count == 0) {
-        return enif_make_tuple3(env, atom_ok, column_info, rows);
+        return enif_make_tuple2(env, atom_ok, enif_make_list(env, 0));
     }
 
-    chunk = duckdb_result_get_chunk(res->result, 0);
-    if(chunk == NULL) {
-        return enif_make_tuple3(env, atom_ok, column_info, rows);
-    }
+    duckdb_data_chunk chunk = duckdb_result_get_chunk(res->result, 0);
+    if(chunk == NULL)
+        return enif_make_tuple2(env, atom_ok, enif_make_list(env, 0));
 
-    column_info = extract_column_info(env, column_info, chunk);
+    ERL_NIF_TERM columns = extract_chunk(env, &(res->result), chunk,
+            duckdb_data_chunk_get_column_count(chunk),
+            duckdb_data_chunk_get_size(chunk));
 
-
+    return make_ok_tuple(env, columns);
 }
 
 /**
@@ -2308,6 +2361,9 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_null = make_atom(env, "null");
     atom_true = make_atom(env, "true");
     atom_false = make_atom(env, "false");
+    atom_type = make_atom(env, "type");
+    atom_data = make_atom(env, "data");
+    atom_name = make_atom(env, "name");
 
     return 0;
 }
