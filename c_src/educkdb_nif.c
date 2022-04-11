@@ -1008,6 +1008,9 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
  * Extract result, chunk version 
  */
 
+
+// [todo] Make a macro for the repeated code.
+
 static ERL_NIF_TERM
 extract_data_boolean(ErlNifEnv *env, bool *vector_data, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1087,8 +1090,6 @@ extract_data_tinyint(ErlNifEnv *env, int8_t *vector_data, idx_t tuple_count) {
     return data;
 }
 
-
-
 static ERL_NIF_TERM
 extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1100,7 +1101,6 @@ extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, idx_t tuple_count) {
 
     return data;
 }
-
 
 static ERL_NIF_TERM
 extract_data_integer(ErlNifEnv *env, int32_t *vector_data, idx_t tuple_count) {
@@ -1166,6 +1166,7 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_UBIGINT:
             return extract_data_ubigint(env, (uint64_t *) data, tuple_count);
 
+        // 
 
         default:
             return extract_data_todo(env, tuple_count);
