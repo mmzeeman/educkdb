@@ -38,7 +38,6 @@
 
 #define NIF_NAME "educkdb_nif"
 
-
 static ErlNifResourceType *educkdb_database_type = NULL;
 static ErlNifResourceType *educkdb_connection_type = NULL;
 static ErlNifResourceType *educkdb_result_type = NULL;
@@ -1010,18 +1009,32 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
 
 // [todo] Make a macro for the repeated code.
+inline static bool
+is_valid(int64_t *validity_mask, idx_t row_idx) {
+    if(validity_mask == NULL)
+        return true;
+
+    idx_t entry_idx = row_idx / 64;
+    idx_t idx_in_entry = row_idx % 64;
+    return validity_mask[entry_idx] & (1 << idx_in_entry);
+}
 
 static ERL_NIF_TERM
-extract_data_boolean(ErlNifEnv *env, bool *vector_data, idx_t tuple_count) {
+extract_data_boolean(ErlNifEnv *env, bool *vector_data, int64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
+
 
     for(idx_t i=tuple_count; i-- > 0; ) {
         ERL_NIF_TERM cell;
 
-        if(*(vector_data + i)) {
-            cell = atom_true;
+        if(is_valid(validity_mask, i)) {
+            if(*(vector_data + i)) {
+                cell = atom_true;
+            } else {
+                cell = atom_false;
+            }
         } else {
-            cell = atom_false;
+            cell = atom_null;
         }
 
         data = enif_make_list_cell(env, cell, data);
@@ -1207,10 +1220,11 @@ extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
 static ERL_NIF_TERM
 extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tuple_count) {
     void *data = duckdb_vector_get_data(vector);
+    uint64_t *validity_mask = duckdb_vector_get_validity(vector);
 
     switch(type_id) {
         case DUCKDB_TYPE_BOOLEAN:
-            return extract_data_boolean(env, (bool *) data, tuple_count);
+            return extract_data_boolean(env, (bool *) data, validity_mask, tuple_count);
 
         // Signed Integers
         case DUCKDB_TYPE_TINYINT:

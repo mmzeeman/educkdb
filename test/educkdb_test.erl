@@ -886,11 +886,11 @@ boolean_extract2_test() ->
        educkdb:extract_result2(R1)
       ),
 
-    {ok, R2} = educkdb:query(Conn, "insert into test values (true, true), (false, false), (true, false);"),
+    {ok, R2} = educkdb:query(Conn, "insert into test values (null, true), (false, null), (true, true), (false, false), (true, false);"),
     ?assertEqual(
        {ok, [ #{ name => <<"Count">>,
                  type => bigint,
-                 data => [3] }
+                 data => [5] }
             ]},
        educkdb:extract_result2(R2)),
 
@@ -898,10 +898,10 @@ boolean_extract2_test() ->
     ?assertEqual(
        {ok, [ #{ name => <<"a">>,
                  type => boolean,
-                 data => [false, true, true] },
+                 data => [null, false, false, true, true] },
               #{ name => <<"b">>,
                  type => boolean,
-                 data => [false, true, false] }
+                 data => [true, null, false, true, false] }
 
             ]},
        educkdb:extract_result2(R3)),
