@@ -1119,7 +1119,7 @@ extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        ERL_NIF_TERM cell = enif_make_int64(env,  *(vector_data + i));
+        ERL_NIF_TERM cell = enif_make_int64(env, *(vector_data + i));
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1131,7 +1131,7 @@ extract_data_float(ErlNifEnv *env, float *vector_data, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        ERL_NIF_TERM cell = enif_make_double(env,  *(vector_data + i));
+        ERL_NIF_TERM cell = enif_make_double(env, (double) *(vector_data + i));
         data = enif_make_list_cell(env, cell, data);
     }
 

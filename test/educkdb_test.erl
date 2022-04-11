@@ -958,6 +958,39 @@ unsigned_extract2_test() ->
 
     ok.
 
+float_and_double_extract2_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a float, b double);"),
+    ?assertEqual(
+       {ok, [ ]},
+       educkdb:extract_result2(R1)
+      ),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values (1.0, 10.1), (2.0, 11.1), (3.0, 12.2);"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"Count">>,
+                 type => bigint,
+                 data => [3] }
+            ]},
+       educkdb:extract_result2(R2)),
+
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"a">>,
+                 type => float,
+                 data => [1.0, 2.0, 3.0] },
+
+              #{ name => <<"b">>,
+                 type => double,
+                 data => [10.1, 11.1, 12.2] }
+
+            ]},
+       educkdb:extract_result2(R3)),
+
+    ok.
+
 
 
 %%
