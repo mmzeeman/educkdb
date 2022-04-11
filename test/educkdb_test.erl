@@ -874,8 +874,90 @@ extract2_test() ->
             ]},
        educkdb:extract_result2(R3)),
 
+    ok.
+
+signed_extract2_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a smallint, b tinyint, c integer, d bigint);"),
+    ?assertEqual(
+       {ok, [ ]},
+       educkdb:extract_result2(R1)
+      ),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values (-10, -10, -10, -10), (11, 11, 11, 11), (12, 12, 12, 12);"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"Count">>,
+                 type => bigint,
+                 data => [3] }
+            ]},
+       educkdb:extract_result2(R2)),
+
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"a">>,
+                 type => smallint,
+                 data => [-10, 11, 12] },
+
+              #{ name => <<"b">>,
+                 type => tinyint,
+                 data => [-10, 11, 12] },
+
+              #{ name => <<"c">>,
+                 type => integer,
+                 data => [-10, 11, 12] },
+
+              #{ name => <<"d">>,
+                 type => bigint,
+                 data => [-10, 11, 12] }
+
+            ]},
+       educkdb:extract_result2(R3)),
 
     ok.
+
+unsigned_extract2_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a usmallint, b utinyint, c uinteger, d ubigint);"),
+    ?assertEqual(
+       {ok, [ ]},
+       educkdb:extract_result2(R1)
+      ),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values (10, 10, 10, 10), (11, 11, 11, 11), (12, 12, 12, 12);"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"Count">>,
+                 type => bigint,
+                 data => [3] }
+            ]},
+       educkdb:extract_result2(R2)),
+
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"a">>,
+                 type => usmallint,
+                 data => [10, 11, 12] },
+
+              #{ name => <<"b">>,
+                 type => utinyint,
+                 data => [10, 11, 12] },
+
+              #{ name => <<"c">>,
+                 type => uinteger,
+                 data => [10, 11, 12] },
+
+              #{ name => <<"d">>,
+                 type => ubigint,
+                 data => [10, 11, 12] }
+
+            ]},
+       educkdb:extract_result2(R3)),
+
+    ok.
+
 
 
 %%
