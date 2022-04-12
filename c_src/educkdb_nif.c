@@ -1177,11 +1177,16 @@ extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mas
 }
 
 static ERL_NIF_TERM
-extract_data_float(ErlNifEnv *env, float *vector_data, idx_t tuple_count) {
+extract_data_float(ErlNifEnv *env, float *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        ERL_NIF_TERM cell = enif_make_double(env, (double) *(vector_data + i));
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            cell = enif_make_double(env, (double) *(vector_data + i));
+        } else {
+            cell = atom_null;
+        }
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1189,11 +1194,16 @@ extract_data_float(ErlNifEnv *env, float *vector_data, idx_t tuple_count) {
 }
 
 static ERL_NIF_TERM
-extract_data_double(ErlNifEnv *env, double *vector_data, idx_t tuple_count) {
+extract_data_double(ErlNifEnv *env, double *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        ERL_NIF_TERM cell = enif_make_double(env,  *(vector_data + i));
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            cell = enif_make_double(env,  *(vector_data + i));
+        } else {
+            cell = atom_null;
+        }
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1201,14 +1211,19 @@ extract_data_double(ErlNifEnv *env, double *vector_data, idx_t tuple_count) {
 }
 
 static ERL_NIF_TERM
-extract_data_timestamp(ErlNifEnv *env, duckdb_timestamp *vector_data, idx_t tuple_count) {
+extract_data_timestamp(ErlNifEnv *env, duckdb_timestamp *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        duckdb_timestamp_struct timestamp = duckdb_from_timestamp(*(vector_data + i));
-        ERL_NIF_TERM cell = enif_make_tuple2(env,
-                make_date_tuple(env, timestamp.date),
-                make_time_tuple(env, timestamp.time));
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_timestamp_struct timestamp = duckdb_from_timestamp(*(vector_data + i));
+            cell = enif_make_tuple2(env,
+                    make_date_tuple(env, timestamp.date),
+                    make_time_tuple(env, timestamp.time));
+        } else {
+            cell = atom_null;
+        }
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1285,13 +1300,13 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
 
         // Floats and Doubles
         case DUCKDB_TYPE_FLOAT:
-            return extract_data_float(env, (float *) data, tuple_count);
+            return extract_data_float(env, (float *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_DOUBLE:
-            return extract_data_double(env, (double *) data, tuple_count);
+            return extract_data_double(env, (double *) data, validity_mask, tuple_count);
             
         // Date and time records
         case DUCKDB_TYPE_TIMESTAMP:
-            return extract_data_timestamp(env, (duckdb_timestamp *) data, tuple_count);
+            return extract_data_timestamp(env, (duckdb_timestamp *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_DATE:
             return extract_data_date(env, (duckdb_date *) data, tuple_count);
         case DUCKDB_TYPE_TIME:
