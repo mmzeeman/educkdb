@@ -1231,12 +1231,17 @@ extract_data_timestamp(ErlNifEnv *env, duckdb_timestamp *vector_data, uint64_t *
 }
 
 static ERL_NIF_TERM
-extract_data_date(ErlNifEnv *env, duckdb_date *vector_data, idx_t tuple_count) {
+extract_data_date(ErlNifEnv *env, duckdb_date *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        duckdb_date_struct date = duckdb_from_date(*(vector_data + i));
-        ERL_NIF_TERM cell = make_date_tuple(env, date);
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_date_struct date = duckdb_from_date(*(vector_data + i));
+            cell = make_date_tuple(env, date);
+        } else {
+            cell = atom_null;
+        }
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1308,7 +1313,7 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_TIMESTAMP:
             return extract_data_timestamp(env, (duckdb_timestamp *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_DATE:
-            return extract_data_date(env, (duckdb_date *) data, tuple_count);
+            return extract_data_date(env, (duckdb_date *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_TIME:
             return extract_data_time(env, (duckdb_time *) data, tuple_count);
 
