@@ -1023,6 +1023,40 @@ float_and_double_extract2_test() ->
 
     ok.
 
+varchar_extract2_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a varchar, b varchar);"),
+    ?assertEqual(
+       {ok, [ ]},
+       educkdb:extract_result2(R1)
+      ),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"Count">>,
+                 type => bigint,
+                 data => [4] }
+            ]},
+       educkdb:extract_result2(R2)),
+
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    ?assertEqual(
+       {ok, [ #{ name => <<"a">>,
+                 type => varchar,
+                 data => [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ] },
+
+              #{ name => <<"b">>,
+                 type => varchar,
+                 data => [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] }
+
+            ]},
+       educkdb:extract_result2(R3)),
+
+    ok.
+
+
 
 
 %%

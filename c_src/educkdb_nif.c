@@ -76,6 +76,18 @@ typedef struct {
     duckdb_appender appender;
 } educkdb_appender;
 
+// Not exported for c-api, see: string_type.hpp
+typedef union {
+    struct {
+        uint32_t length;
+        char prefix[4];
+        char *ptr;
+    } pointer;
+    struct {
+        uint32_t length;
+        char inlined[12];
+    } inlined;
+} duckdb_string_t;
 
 typedef enum {
     cmd_unknown,
@@ -1266,6 +1278,32 @@ extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_m
     return data;
 }
 
+static ERL_NIF_TERM
+extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_string_t value = *(vector_data + i);
+
+            if(value.pointer.length > 12) {
+                cell = make_binary(env, value.pointer.ptr, value.pointer.length);
+            } else {
+                cell = make_binary(env, value.inlined.inlined, value.inlined.length);
+            }
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+
 
 static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
@@ -1325,7 +1363,9 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         // Interval
         case DUCKDB_TYPE_INTERVAL:
         case DUCKDB_TYPE_HUGEINT:
+            return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_VARCHAR:
+            return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_BLOB:
         case DUCKDB_TYPE_TIMESTAMP_S:
         case DUCKDB_TYPE_TIMESTAMP_MS:
