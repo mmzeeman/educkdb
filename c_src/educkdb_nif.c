@@ -969,7 +969,6 @@ educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     ERL_NIF_TERM column_info;
     ERL_NIF_TERM rows;
 
-
     if(argc != 1) {
         return enif_make_badarg(env);
     }
@@ -1376,6 +1375,7 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_MAP:  
         case DUCKDB_TYPE_UUID:
         case DUCKDB_TYPE_JSON:
+        default:
             return extract_data_todo(env, tuple_count);
     }
 }
@@ -1409,9 +1409,11 @@ extract_chunk(ErlNifEnv *env, duckdb_result *result, duckdb_data_chunk chunk, id
         ERL_NIF_TERM vector_map = extract_vector(env, vector, tuple_count);  
 
         // Add the column name
-        const char *column_name = duckdb_column_name(result, i);
-        ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
-        if(enif_make_map_put(env, vector_map, atom_name, name_binary, &vector_map)) { }
+        if(result != NULL) {
+            const char *column_name = duckdb_column_name(result, i);
+            ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
+            if(enif_make_map_put(env, vector_map, atom_name, name_binary, &vector_map)) { }
+        }
 
         column[i] = vector_map;
     }
@@ -1453,6 +1455,26 @@ educkdb_extract_result2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
  */
 
 static ERL_NIF_TERM
+educkdb_chunk_extract(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_data_chunk *chunk;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_data_chunk_type, (void **) &chunk)) {
+        return enif_make_badarg(env);
+    }
+
+    ERL_NIF_TERM columns = extract_chunk(env, NULL, chunk->data_chunk,
+            duckdb_data_chunk_get_column_count(chunk->data_chunk),
+            duckdb_data_chunk_get_size(chunk->data_chunk));
+
+    return make_ok_tuple(env, columns);
+}
+
+
+static ERL_NIF_TERM
 educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
     idx_t count;
@@ -1467,6 +1489,33 @@ educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     count = duckdb_result_chunk_count(res->result);
     return enif_make_uint64(env, count);
+}
+static ERL_NIF_TERM
+
+educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+    idx_t count;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    idx_t column_count = duckdb_column_count(&(res->result));
+
+    ERL_NIF_TERM column_names = enif_make_list(env, 0);
+
+    for(idx_t i=column_count; i-- > 0; ) {
+        const char *column_name = duckdb_column_name(&(res->result), i);
+        ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
+
+        column_names = enif_make_list_cell(env, name_binary, column_names);
+    }
+
+    return column_names;
 }
 
 static ERL_NIF_TERM
@@ -1506,6 +1555,47 @@ educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     return make_ok_tuple(env, rchunk);
 }
+ 
+static ERL_NIF_TERM
+make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) { 
+    ERL_NIF_TERM chunks[chunk_count];
+
+    for(idx_t i=0; i < chunk_count; i++) {
+        duckdb_data_chunk chunk = duckdb_result_get_chunk(result, i);
+        if(chunk == NULL) {
+            return make_error_tuple(env, "no_chunk");
+        }
+
+        educkdb_data_chunk *echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
+        if(echunk == NULL) {
+            duckdb_destroy_data_chunk(chunk);
+            return make_error_tuple(env, "no_memory");
+        }
+
+        echunk->data_chunk = chunk;
+        chunks[i] = enif_make_resource(env, echunk);
+        enif_release_resource(echunk);
+    }
+
+    return make_ok_tuple(env, enif_make_list_from_array(env, chunks, chunk_count)); 
+}
+
+static ERL_NIF_TERM
+educkdb_get_chunks(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_result *res;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    idx_t chunk_count = duckdb_result_chunk_count(res->result);
+    return make_chunks(env, res->result, chunk_count);
+}
+
 
 static ERL_NIF_TERM
 educkdb_chunk_get_column_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -2727,25 +2817,32 @@ static int on_upgrade(ErlNifEnv* env, void** priv, void** old_priv_data, ERL_NIF
 }
 
 static ErlNifFunc nif_funcs[] = {
+    // Connect
     {"open", 2, educkdb_open, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"close", 1, educkdb_close, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"config_flag_info", 0, educkdb_config_flag_info},
-
     {"connect", 1, educkdb_connect, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"query_cmd", 2, educkdb_query_cmd},
 
+    // Queries
+    {"query_cmd", 2, educkdb_query_cmd},
     {"prepare", 2, educkdb_prepare},
     {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
 
+    // Result
     {"extract_result", 1, educkdb_extract_result},
     {"extract_result2", 1, educkdb_extract_result2},
-
     {"chunk_count", 1, educkdb_chunk_count},
+    {"column_names", 1, educkdb_column_names},
     {"get_chunk", 2, educkdb_get_chunk},
+    {"get_chunks", 1, educkdb_get_chunks},
+
+    // Chunks
+    {"chunk_extract", 1, educkdb_chunk_extract},
     {"chunk_get_column_count", 1, educkdb_chunk_get_column_count},
     {"chunk_get_size", 1, educkdb_chunk_get_size},
 
+    // Prepare
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},
     {"bind_int16", 3, educkdb_bind_int16},
@@ -2766,6 +2863,7 @@ static ErlNifFunc nif_funcs[] = {
 
     {"bind_null", 2, educkdb_bind_null},
 
+    // Appender
     {"appender_create", 3, educkdb_appender_create},
     {"append_boolean_intern", 2, educkdb_append_boolean},
     {"append_int8", 2, educkdb_append_int8},

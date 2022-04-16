@@ -48,14 +48,18 @@
     bind_varchar/3,
     bind_null/2,
 
+    %% Results
     extract_result/1,
     extract_result2/1,
-
     get_chunk/2,
+    get_chunks/1,
     chunk_count/1,
+    column_names/1,
+
+    %% Chunks
+    chunk_extract/1,
     chunk_get_column_count/1,
     chunk_get_size/1,
-
 
     appender_create/3,
     append_boolean/2,
@@ -340,8 +344,12 @@ extract_result2(_Result) ->
 %% Chunks
 %%
 
--spec get_chunk(result(), uint64()) -> data_chunk(). 
+-spec get_chunk(result(), uint64()) -> {ok, data_chunk()} | {error, _}. 
 get_chunk(_Result, _ChunkIndex) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec get_chunks(result()) -> {ok, [data_chunk()]} | {error, _}. 
+get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
  
 
@@ -349,6 +357,14 @@ get_chunk(_Result, _ChunkIndex) ->
 chunk_count(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
+-spec column_names(result()) -> [binary()].
+column_names(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
+
+
+%-spec chunk_extract(data_chunk()) -> uint64().
+chunk_extract(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 -spec chunk_get_column_count(data_chunk()) -> uint64().
 chunk_get_column_count(_Chunk) ->

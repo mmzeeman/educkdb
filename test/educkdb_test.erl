@@ -115,6 +115,21 @@ query_test() ->
     ok = educkdb:close(Db),
     ok.
 
+column_names_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, Res1} = educkdb:query(Conn, "create table test(a integer, b varchar(20));"),
+    ?assertEqual([<<"Count">>], educkdb:column_names(Res1)),
+
+    {ok, Res2} = educkdb:query(Conn, "insert into test values (1, 'a'), (2, 'b') ;"),
+    ?assertEqual([<<"Count">>], educkdb:column_names(Res2)),
+
+    {ok, Res3} = educkdb:query(Conn, "select * from test;"),
+    ?assertEqual([<<"a">>, <<"b">>], educkdb:column_names(Res3)),
+
+    ok.
+
 chunk_count_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -138,13 +153,13 @@ chunk_test() ->
     0 = educkdb:chunk_count(Res),
 
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
-    {ok, Chunk1} = educkdb:get_chunk(Res1, 0),
+    {ok, [Chunk1]} = educkdb:get_chunks(Res1),
     ?assert(is_reference(Chunk1)),
     ?assertEqual(1, educkdb:chunk_get_column_count(Chunk1)),
     ?assertEqual(1, educkdb:chunk_get_size(Chunk1)),
 
     {ok, Res2} = educkdb:query(Conn, "select * from test;"),
-    {ok, Chunk2} = educkdb:get_chunk(Res2, 0),
+    {ok, [Chunk2]} = educkdb:get_chunks(Res2),
     ?assert(is_reference(Chunk2)),
     ?assertEqual(1, educkdb:chunk_get_column_count(Chunk2)),
     ?assertEqual(3, educkdb:chunk_get_size(Chunk2)),
@@ -857,22 +872,21 @@ extract2_test() ->
        {ok, [ ]},
        educkdb:extract_result2(R1)
       ),
-
     {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
+    {ok, C2} = educkdb:get_chunk(R2, 0),
     ?assertEqual(
-       {ok, [ #{ name => <<"Count">>,
-                 type => bigint,
+       {ok, [ #{ type => bigint,
                  data => [3] }
             ]},
-       educkdb:extract_result2(R2)),
+       educkdb:chunk_extract(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    {ok, C3} = educkdb:get_chunk(R3, 0),
     ?assertEqual(
-       {ok, [ #{ name => <<"a">>,
-                 type => integer,
+       {ok, [ #{ type => integer,
                  data => [10, 11, 12] }
             ]},
-       educkdb:extract_result2(R3)),
+       educkdb:chunk_extract(C3)),
 
     ok.
 
