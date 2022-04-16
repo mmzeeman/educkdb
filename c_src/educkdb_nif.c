@@ -2830,8 +2830,8 @@ static ErlNifFunc nif_funcs[] = {
     {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
 
     // Result
-    {"extract_result", 1, educkdb_extract_result},
-    {"extract_result2", 1, educkdb_extract_result2},
+//    {"extract_result", 1, educkdb_extract_result},
+//    {"extract_result2", 1, educkdb_extract_result2},
     {"chunk_count", 1, educkdb_chunk_count},
     {"column_names", 1, educkdb_column_names},
     {"get_chunk", 2, educkdb_get_chunk},

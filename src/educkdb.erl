@@ -50,7 +50,7 @@
 
     %% Results
     extract_result/1,
-    extract_result2/1,
+    % extract_result2/1,
     get_chunk/2,
     get_chunks/1,
     chunk_count/1,
@@ -332,12 +332,12 @@ bind_null(_Stmt, _Index) ->
 %%
 
 %% @doc Extract the values from the result.
--spec extract_result(result()) -> {ok, [], []}.
-extract_result(_Result) -> 
-    erlang:nif_error(nif_library_not_loaded).
+%%-spec extract_result(result()) -> {ok, [], []}.
+%%extract_result(_Result) -> 
+%%    erlang:nif_error(nif_library_not_loaded).
     
-extract_result2(_Result) -> 
-    erlang:nif_error(nif_library_not_loaded).
+%%extract_result2(_Result) -> 
+%%    erlang:nif_error(nif_library_not_loaded).
  
 
 %%
@@ -487,7 +487,29 @@ appender_end_row(_Appender) ->
 %% Higher Level API
 %%
 
-%% @doc Do a simple sql query without parameters.
+extract_result(Result) ->
+    extract_result1(Result, chunk_count(Result)).
+
+extract_result1(_Result, 0) -> {ok, []};
+extract_result1(Result, N) when N > 0 ->
+    case get_chunk(Result, 0) of
+        {ok, Chunk} ->
+            Names = column_names(Result),
+            case chunk_extract(Chunk) of
+                {ok, Columns} ->
+                    {ok, lists:zipwith(
+                           fun(Column, Name) ->
+                                   Column#{ name => Name }
+                           end,
+                           Columns,
+                           Names)};
+                {error, _}=E -> E
+            end;
+        {error, _}=E -> E
+    end.
+
+
+%% @doc Do a simple sql query without parameters, and retrieve the first chunk of data.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
