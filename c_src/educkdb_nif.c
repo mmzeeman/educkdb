@@ -739,281 +739,6 @@ make_time_tuple(ErlNifEnv *env, duckdb_time_struct time) {
             enif_make_double(env, (double) time.sec + (time.micros / 1000000.0)));
 }
 
-static ERL_NIF_TERM
-make_cell(ErlNifEnv *env, duckdb_result *result, idx_t col, idx_t row) {
-    if(duckdb_value_is_null(result, col, row)) {
-        return atom_null;
-    }
-
-    switch(duckdb_column_type(result, col)) {
-        case DUCKDB_TYPE_BOOLEAN:
-            if(duckdb_value_boolean(result, col, row)) {
-                return atom_true;
-            } 
-
-            return atom_false;
-        case DUCKDB_TYPE_TINYINT:
-        case DUCKDB_TYPE_SMALLINT:
-        case DUCKDB_TYPE_INTEGER:
-            {
-                int32_t value = duckdb_value_int32(result, col, row);
-                return enif_make_int(env, value);
-            }
-        case DUCKDB_TYPE_BIGINT:
-            {
-                int64_t value = duckdb_value_int64(result, col, row);
-                return enif_make_int64(env, value);
-            }
-        case DUCKDB_TYPE_UTINYINT:
-        case DUCKDB_TYPE_USMALLINT:
-        case DUCKDB_TYPE_UINTEGER:
-            {
-                uint32_t value = duckdb_value_uint32(result, col, row);
-                return enif_make_uint(env, value);
-            }
-        case DUCKDB_TYPE_UBIGINT:
-            {
-                uint64_t value = duckdb_value_uint64(result, col, row);
-                return enif_make_uint64(env, value);
-            }
-        case DUCKDB_TYPE_FLOAT:
-            // Erlang does not have floats, fall through to double.
-        case DUCKDB_TYPE_DOUBLE:
-            {
-                double value = duckdb_value_double(result, col, row);
-                return enif_make_double(env, value);
-            }
-        case DUCKDB_TYPE_TIMESTAMP:
-            {
-                duckdb_timestamp value = duckdb_value_timestamp(result, col, row);
-                duckdb_timestamp_struct timestamp = duckdb_from_timestamp(value);
-                return enif_make_tuple2(env, make_date_tuple(env, timestamp.date), make_time_tuple(env, timestamp.time));
-            }
-        case DUCKDB_TYPE_DATE:
-            {
-                duckdb_date value = duckdb_value_date(result, col, row);
-                duckdb_date_struct date = duckdb_from_date(value);
-                return make_date_tuple(env, date);
-            }
-        case DUCKDB_TYPE_TIME:
-            {
-                duckdb_time value = duckdb_value_time(result, col, row);
-                duckdb_time_struct time = duckdb_from_time(value);
-                return make_time_tuple(env, time);
-            }
-        case DUCKDB_TYPE_INTERVAL:
-            return make_atom(env, "todo");
-        case DUCKDB_TYPE_HUGEINT:
-            // record with two 64 bit integers
-            return make_atom(env, "todo");
-        case DUCKDB_TYPE_VARCHAR:
-            {
-                char *value = duckdb_value_varchar(result, col, row);
-                if(value == NULL) {
-                    return atom_null;
-                }
-
-                ERL_NIF_TERM value_binary;
-                value_binary = make_binary(env, value, strlen(value));
-                duckdb_free(value);
-                return value_binary;
-            }
-        case DUCKDB_TYPE_BLOB:
-            return make_atom(env, "todo");
-
-        case DUCKDB_TYPE_DECIMAL:
-        case DUCKDB_TYPE_TIMESTAMP_S:
-        case DUCKDB_TYPE_TIMESTAMP_MS:
-        case DUCKDB_TYPE_TIMESTAMP_NS:
-        case DUCKDB_TYPE_ENUM:
-        case DUCKDB_TYPE_LIST:
-        case DUCKDB_TYPE_STRUCT:
-        case DUCKDB_TYPE_MAP:  
-        case DUCKDB_TYPE_UUID:
-        case DUCKDB_TYPE_JSON:
-            return make_atom(env, "todo");
-
-        default:
-            return atom_error;
-    }
-}
-
-inline static idx_t
-min_idx(idx_t a, idx_t b) {
-    if(a < b) return a;
-    return b;
-}
-
-inline static idx_t
-max_idx(idx_t a, idx_t b) {
-    if(a > b) return a;
-    return b;
-}
-
-static ERL_NIF_TERM
-make_column_info(ErlNifEnv *env, duckdb_result *result) {
-    idx_t row_count = duckdb_row_count(result);
-    idx_t column_count = duckdb_column_count(result);
-    ERL_NIF_TERM column_info = enif_make_list(env, 0);
-
-
-    /* The row count can be 0, while the column_info still contains data, so we 
-     * have to prevent to return column info when there are no rows.
-     **/
-    if(row_count > 0) {
-        for(idx_t c=column_count; c-- > 0; ) {
-            const char *column_name = duckdb_column_name(result, c);
-            ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
-            const char *column_type_name = duckdb_type_name(duckdb_column_type(result, c));
-            ERL_NIF_TERM type_atom = make_atom(env, column_type_name);
-            ERL_NIF_TERM column_info_tuple = enif_make_tuple3(env, atom_column, name_binary, type_atom);
-
-            column_info = enif_make_list_cell(env, column_info_tuple, column_info);
-        }
-    }
-
-    return column_info;
-}
-
-static ERL_NIF_TERM
-educkdb_yield_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
-    ERL_NIF_TERM rows, row, cell;
-    unsigned long int row_count, column_count, from_row, downto_row, row_chunk_size;
-    int pct;
-    struct timeval start, stop, slice;
-    gettimeofday(&start, NULL);
-
-    if(argc != 6) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
-        return enif_make_badarg(env);
-    }
-    row_count = duckdb_row_count(&(res->result));
-    column_count = duckdb_column_count(&(res->result));
-
-    if(!enif_is_list(env, argv[2])) {
-        return enif_make_badarg(env);
-    }
-    if(!enif_get_uint64(env, argv[3], &from_row)) {
-        return enif_make_badarg(env);
-    }
-    if(!enif_get_uint64(env, argv[4], &downto_row)) {
-        return enif_make_badarg(env);
-    }
-
-    rows = argv[2];
-    for(idx_t r=from_row; r-- > downto_row; ) {
-        row = enif_make_list(env, 0);
-
-        for(idx_t c=column_count; c-- > 0; ) {
-            cell = make_cell(env, &(res->result), c, r);
-            row = enif_make_list_cell(env, cell, row);
-        }
-        rows = enif_make_list_cell(env, row, rows);
-    }
-
-    if(downto_row != 0) {
-        // Schedule another batch;
-        if(!enif_get_uint64(env, argv[5], &row_chunk_size)) {
-            return enif_make_badarg(env);
-        }
-
-        ERL_NIF_TERM new_argv[6];
-
-        new_argv[0] = argv[0];
-        new_argv[1] = argv[1];
-        new_argv[2] = rows;
-        new_argv[3] = argv[4];
-        new_argv[4] = enif_make_uint64(env, downto_row - min_idx(downto_row, row_chunk_size));
-        new_argv[5] = argv[5];
-
-        gettimeofday(&stop, NULL);
-        timersub(&stop, &start, &slice);
-        pct = (int)((slice.tv_sec*1000000+slice.tv_usec)/10);
-        if (pct > 100) {
-            pct = 100;
-        } else if (pct == 0) {
-            pct = 1;
-        } 
-
-        /* Adjust the row_chunk_size when needed */
-        if(pct < 20) {
-            new_argv[5] = enif_make_uint64(env, row_chunk_size + CHUNK_SIZE);
-        } else if(pct > 80) {
-            new_argv[5] = enif_make_uint64(env, row_chunk_size / 2);
-        } else {
-            new_argv[5] = argv[5];
-        }
-
-        /* Inform the scheduler how much time we used */
-        enif_consume_timeslice(env, pct);
-        
-        return enif_schedule_nif(env, "yield_extract_result", 0, educkdb_yield_extract_result, argc, new_argv);
-    }
-
-    if(!enif_is_list(env, argv[1])) {
-        return enif_make_badarg(env);
-    }
-
-    return enif_make_tuple3(env, atom_ok, argv[1], rows);
-}
-
-static ERL_NIF_TERM
-educkdb_extract_result(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
-    idx_t row_count, column_count;
-
-    ERL_NIF_TERM column_info;
-    ERL_NIF_TERM rows;
-
-    if(argc != 1) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
-        return enif_make_badarg(env);
-    }
-
-    /* For small number of results we can directly return the results without
-     * rescheduling the nif.
-     */
-
-    /* Column info */
-    row_count = duckdb_row_count(&(res->result));
-    column_count = duckdb_column_count(&(res->result));
-
-    /* The row count can be 0, while the column_info still contains data, so we 
-     * have to prevent to return column info when there are no rows.
-     **/
-    column_info = make_column_info(env, &(res->result));
-    rows = enif_make_list(env, 0);
-    if(row_count == 0) {
-        return enif_make_tuple3(env, atom_ok, column_info, rows);
-    }
-
-    /* Prepare args for yielding nif call */
-    ERL_NIF_TERM new_args[6];
-
-    /* Determine the number of rows we can return in one yield call */
-    idx_t row_chunk_size = 1;
-    if(row_count > 0 && column_count > 0 && column_count < CHUNK_SIZE) {
-        row_chunk_size = CHUNK_SIZE / column_count;
-    }
-
-    new_args[0] = argv[0];
-    new_args[1] = column_info;
-    new_args[2] = rows;
-    new_args[3] = enif_make_uint64(env, (unsigned long int) row_count); 
-    new_args[4] = enif_make_uint64(env, (unsigned long int) row_count - min_idx(row_count, row_chunk_size)); 
-    new_args[5] = enif_make_uint64(env, (unsigned long int) row_chunk_size);
-
-    return educkdb_yield_extract_result(env, 6, new_args);
-}
-
-
 /*
  * Extract result, chunk version 
  */
@@ -1030,7 +755,6 @@ is_valid(uint64_t *validity_mask, idx_t row_idx) {
 static ERL_NIF_TERM
 extract_data_boolean(ErlNifEnv *env, bool *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
-
 
     for(idx_t i=tuple_count; i-- > 0; ) {
         ERL_NIF_TERM cell;
@@ -1401,54 +1125,17 @@ extract_vector(ErlNifEnv *env, duckdb_vector vector, idx_t tuple_count) {
 }
 
 static ERL_NIF_TERM
-extract_chunk(ErlNifEnv *env, duckdb_result *result, duckdb_data_chunk chunk, idx_t column_count, idx_t tuple_count) {
+extract_chunk(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_count, idx_t tuple_count) {
     ERL_NIF_TERM column[column_count];
 
     for(idx_t i=0; i < column_count; i++) {
         duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, i);
         ERL_NIF_TERM vector_map = extract_vector(env, vector, tuple_count);  
-
-        // Add the column name
-        if(result != NULL) {
-            const char *column_name = duckdb_column_name(result, i);
-            ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
-            if(enif_make_map_put(env, vector_map, atom_name, name_binary, &vector_map)) { }
-        }
-
         column[i] = vector_map;
     }
 
     return enif_make_list_from_array(env, column, column_count); 
 } 
-
-static ERL_NIF_TERM
-educkdb_extract_result2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
-    idx_t chunk_count;
-
-    if(argc != 1) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
-        return enif_make_badarg(env);
-    }
-
-    chunk_count = duckdb_result_chunk_count(res->result);
-    if(chunk_count == 0) {
-        return enif_make_tuple2(env, atom_ok, enif_make_list(env, 0));
-    }
-
-    duckdb_data_chunk chunk = duckdb_result_get_chunk(res->result, 0);
-    if(chunk == NULL)
-        return enif_make_tuple2(env, atom_ok, enif_make_list(env, 0));
-
-    ERL_NIF_TERM columns = extract_chunk(env, &(res->result), chunk,
-            duckdb_data_chunk_get_column_count(chunk),
-            duckdb_data_chunk_get_size(chunk));
-
-    return make_ok_tuple(env, columns);
-}
 
 /**
  * Chunks
@@ -1466,7 +1153,7 @@ educkdb_chunk_extract(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    ERL_NIF_TERM columns = extract_chunk(env, NULL, chunk->data_chunk,
+    ERL_NIF_TERM columns = extract_chunk(env, chunk->data_chunk,
             duckdb_data_chunk_get_column_count(chunk->data_chunk),
             duckdb_data_chunk_get_size(chunk->data_chunk));
 
@@ -2830,8 +2517,6 @@ static ErlNifFunc nif_funcs[] = {
     {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
 
     // Result
-//    {"extract_result", 1, educkdb_extract_result},
-//    {"extract_result2", 1, educkdb_extract_result2},
     {"chunk_count", 1, educkdb_chunk_count},
     {"column_names", 1, educkdb_column_names},
     {"get_chunk", 2, educkdb_get_chunk},
