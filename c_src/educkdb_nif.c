@@ -112,13 +112,11 @@ typedef struct {
 static ERL_NIF_TERM atom_educkdb;
 static ERL_NIF_TERM atom_ok;
 static ERL_NIF_TERM atom_error;
-static ERL_NIF_TERM atom_column;
 static ERL_NIF_TERM atom_null;
 static ERL_NIF_TERM atom_true;
 static ERL_NIF_TERM atom_false;
 static ERL_NIF_TERM atom_type;
 static ERL_NIF_TERM atom_data;
-static ERL_NIF_TERM atom_name;
 
 static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
@@ -2475,13 +2473,11 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_educkdb = make_atom(env, "educkdb");
     atom_ok = make_atom(env, "ok");
     atom_error = make_atom(env, "error");
-    atom_column = make_atom(env, "column");
     atom_null = make_atom(env, "null");
     atom_true = make_atom(env, "true");
     atom_false = make_atom(env, "false");
     atom_type = make_atom(env, "type");
     atom_data = make_atom(env, "data");
-    atom_name = make_atom(env, "name");
 
     return 0;
 }
