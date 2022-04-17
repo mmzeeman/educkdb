@@ -2516,9 +2516,9 @@ static ErlNifFunc nif_funcs[] = {
     {"get_chunks", 1, educkdb_get_chunks},
 
     // Chunks
-    {"chunk_extract", 1, educkdb_chunk_extract},
-    {"chunk_get_column_count", 1, educkdb_chunk_get_column_count},
-    {"chunk_get_size", 1, educkdb_chunk_get_size},
+    {"extract_chunk", 1, educkdb_chunk_extract},
+    {"get_chunk_column_count", 1, educkdb_chunk_get_column_count},
+    {"get_chunk_size", 1, educkdb_chunk_get_size},
 
     // Prepare
     {"bind_boolean_intern", 3, educkdb_bind_boolean},

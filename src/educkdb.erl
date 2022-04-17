@@ -50,16 +50,15 @@
 
     %% Results
     extract_result/1,
-    % extract_result2/1,
     get_chunk/2,
     get_chunks/1,
     chunk_count/1,
     column_names/1,
 
     %% Chunks
-    chunk_extract/1,
-    chunk_get_column_count/1,
-    chunk_get_size/1,
+    extract_chunk/1,
+    get_chunk_column_count/1,
+    get_chunk_size/1,
 
     appender_create/3,
     append_boolean/2,
@@ -84,7 +83,8 @@
 
 %% High Level Api
 -export([
-    squery/2
+    squery/2,
+    execute/1
 ]).
 
 %% low-level api
@@ -330,28 +330,14 @@ bind_null(_Stmt, _Index) ->
 %%
 %% Results
 %%
-
-%% @doc Extract the values from the result.
-%%-spec extract_result(result()) -> {ok, [], []}.
-%%extract_result(_Result) -> 
-%%    erlang:nif_error(nif_library_not_loaded).
-    
-%%extract_result2(_Result) -> 
-%%    erlang:nif_error(nif_library_not_loaded).
- 
-
 %%
-%% Chunks
-%%
-
--spec get_chunk(result(), uint64()) -> {ok, data_chunk()} | {error, _}. 
-get_chunk(_Result, _ChunkIndex) -> 
-    erlang:nif_error(nif_library_not_loaded).
-
 -spec get_chunks(result()) -> [data_chunk()]. 
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
- 
+
+ -spec get_chunk(result(), uint64()) -> {ok, data_chunk()} | {error, _}. 
+get_chunk(_Result, _ChunkIndex) -> 
+    erlang:nif_error(nif_library_not_loaded).
 
 -spec chunk_count(result()) -> uint64().
 chunk_count(_Result) -> 
@@ -362,16 +348,21 @@ column_names(_Result) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
+%%
+%% Chunks
+%%
+
+
 %-spec chunk_extract(data_chunk()) -> uint64().
-chunk_extract(_Chunk) ->
+extract_chunk(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec chunk_get_column_count(data_chunk()) -> uint64().
-chunk_get_column_count(_Chunk) ->
+-spec get_chunk_column_count(data_chunk()) -> uint64().
+get_chunk_column_count(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec chunk_get_size(data_chunk()) -> uint64().
-chunk_get_size(_Chunk) ->
+-spec get_chunk_size(data_chunk()) -> uint64().
+get_chunk_size(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%
@@ -487,6 +478,7 @@ appender_end_row(_Appender) ->
 %% Higher Level API
 %%
 
+%% @doc Extra
 extract_result(Result) ->
     extract_result1(Result, chunk_count(Result)).
 
@@ -495,7 +487,7 @@ extract_result1(Result, N) when N > 0 ->
     case get_chunk(Result, 0) of
         {ok, Chunk} ->
             Names = column_names(Result),
-            Columns = chunk_extract(Chunk),
+            Columns = extract_chunk(Chunk),
             {ok, lists:zipwith(fun(Column, Name) ->
                                         Column#{ name => Name }
                                end,
@@ -505,14 +497,21 @@ extract_result1(Result, N) when N > 0 ->
             E
     end.
 
-
-%% @doc Do a simple sql query without parameters, and retrieve the first chunk of data.
+%% @doc Do a simple sql query without parameters, and retrieve the first data chunk.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
             extract_result(Result);
         {error, _}=E ->
             E
+    end.
+
+%% @doc Execute a prepared statement, and retrieve the first data chunk. 
+execute(Stmt) ->
+    case educkdb:execute_prepared(Stmt) of
+        {ok, Result} ->
+            educkdb:extract_result(Result);
+        {error, _}=E ->E
     end.
 
 

@@ -156,14 +156,14 @@ chunk_test() ->
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     [Chunk1] = educkdb:get_chunks(Res1),
     ?assert(is_reference(Chunk1)),
-    ?assertEqual(1, educkdb:chunk_get_column_count(Chunk1)),
-    ?assertEqual(1, educkdb:chunk_get_size(Chunk1)),
+    ?assertEqual(1, educkdb:get_chunk_column_count(Chunk1)),
+    ?assertEqual(1, educkdb:get_chunk_size(Chunk1)),
 
     {ok, Res2} = educkdb:query(Conn, "select * from test;"),
     [Chunk2] = educkdb:get_chunks(Res2),
     ?assert(is_reference(Chunk2)),
-    ?assertEqual(1, educkdb:chunk_get_column_count(Chunk2)),
-    ?assertEqual(3, educkdb:chunk_get_size(Chunk2)),
+    ?assertEqual(1, educkdb:get_chunk_column_count(Chunk2)),
+    ?assertEqual(3, educkdb:get_chunk_size(Chunk2)),
 
     ok.
 
@@ -829,7 +829,7 @@ yielding_test() ->
     {ok, Res} = educkdb:query(Conn, "select a from test order by a;"),
 
     Chunks = [ begin
-                   [Col] = educkdb:chunk_extract(C),
+                   [Col] = educkdb:extract_chunk(C),
                    maps:get(data, Col)
                end || C <- educkdb:get_chunks(Res) ],
 
@@ -893,12 +893,12 @@ extract_test() ->
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
     {ok, C2} = educkdb:get_chunk(R2, 0),
-    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:chunk_extract(C2)),
+    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     {ok, C3} = educkdb:get_chunk(R3, 0),
     ?assertEqual( [ #{ type => integer, data => [10, 11, 12] } ],
-       educkdb:chunk_extract(C3)),
+       educkdb:extract_chunk(C3)),
 
     ok.
 
@@ -942,7 +942,7 @@ signed_extract_test() ->
     {ok, C2} = educkdb:get_chunk(R2, 0),
     ?assertEqual(
        [ #{ type => bigint, data => [3] } ],
-       educkdb:chunk_extract(C2)),
+       educkdb:extract_chunk(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     {ok, C3} = educkdb:get_chunk(R3, 0),
@@ -960,7 +960,7 @@ signed_extract_test() ->
             data => [-10, 11, 12] }
 
        ],
-       educkdb:chunk_extract(C3)),
+       educkdb:extract_chunk(C3)),
 
     ok.
 
@@ -977,7 +977,7 @@ unsigned_extract_test() ->
        [ #{ type => bigint,
                  data => [3] }
        ],
-       educkdb:chunk_extract(C2)),
+       educkdb:extract_chunk(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     {ok, C3} = educkdb:get_chunk(R3, 0),
@@ -995,7 +995,7 @@ unsigned_extract_test() ->
             data => [10, 11, 12] }
 
        ],
-       educkdb:chunk_extract(C3)),
+       educkdb:extract_chunk(C3)),
 
     ok.
 
@@ -1008,7 +1008,7 @@ float_and_double_extract2_test() ->
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (1.0, 10.1), (2.0, 11.1), (3.0, 12.2);"),
     {ok, C2} = educkdb:get_chunk(R2, 0),
-    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:chunk_extract(C2)),
+    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     {ok, C3} = educkdb:get_chunk(R3, 0),
@@ -1020,7 +1020,7 @@ float_and_double_extract2_test() ->
             data => [10.1, 11.1, 12.2] }
 
        ],
-       educkdb:chunk_extract(C3)),
+       educkdb:extract_chunk(C3)),
 
     ok.
 
@@ -1033,7 +1033,7 @@ varchar_extract_test() ->
 
     {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
     {ok, C2} = educkdb:get_chunk(R2, 0),
-    ?assertEqual( [ #{ type => bigint, data => [4] } ], educkdb:chunk_extract(C2)),
+    ?assertEqual( [ #{ type => bigint, data => [4] } ], educkdb:extract_chunk(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     {ok, C3} = educkdb:get_chunk(R3, 0),
@@ -1041,7 +1041,7 @@ varchar_extract_test() ->
        [ #{ type => varchar, data => [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ] },
               #{ type => varchar, data => [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] }
        ],
-       educkdb:chunk_extract(C3)),
+       educkdb:extract_chunk(C3)),
 
     ok.
 
