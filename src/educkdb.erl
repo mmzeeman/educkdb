@@ -348,7 +348,7 @@ bind_null(_Stmt, _Index) ->
 get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec get_chunks(result()) -> {ok, [data_chunk()]} | {error, _}. 
+-spec get_chunks(result()) -> [data_chunk()]. 
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
  
@@ -495,17 +495,14 @@ extract_result1(Result, N) when N > 0 ->
     case get_chunk(Result, 0) of
         {ok, Chunk} ->
             Names = column_names(Result),
-            case chunk_extract(Chunk) of
-                {ok, Columns} ->
-                    {ok, lists:zipwith(
-                           fun(Column, Name) ->
-                                   Column#{ name => Name }
-                           end,
-                           Columns,
-                           Names)};
-                {error, _}=E -> E
-            end;
-        {error, _}=E -> E
+            Columns = chunk_extract(Chunk),
+            {ok, lists:zipwith(fun(Column, Name) ->
+                                        Column#{ name => Name }
+                               end,
+                               Columns,
+                               Names)};
+        {error, _}=E ->
+            E
     end.
 
 

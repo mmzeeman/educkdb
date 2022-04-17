@@ -1151,7 +1151,7 @@ educkdb_chunk_extract(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             duckdb_data_chunk_get_column_count(chunk->data_chunk),
             duckdb_data_chunk_get_size(chunk->data_chunk));
 
-    return make_ok_tuple(env, columns);
+    return columns;
 }
 
 
@@ -1243,13 +1243,13 @@ make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) {
     for(idx_t i=0; i < chunk_count; i++) {
         duckdb_data_chunk chunk = duckdb_result_get_chunk(result, i);
         if(chunk == NULL) {
-            return make_error_tuple(env, "no_chunk");
+            return enif_raise_exception(env, make_atom(env, "no_chunk"));
         }
 
         educkdb_data_chunk *echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
         if(echunk == NULL) {
             duckdb_destroy_data_chunk(chunk);
-            return make_error_tuple(env, "no_memory");
+            return enif_raise_exception(env, make_atom(env, "no_memory"));
         }
 
         echunk->data_chunk = chunk;
@@ -1257,7 +1257,7 @@ make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) {
         enif_release_resource(echunk);
     }
 
-    return make_ok_tuple(env, enif_make_list_from_array(env, chunks, chunk_count)); 
+    return enif_make_list_from_array(env, chunks, chunk_count); 
 }
 
 static ERL_NIF_TERM
