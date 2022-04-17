@@ -181,7 +181,7 @@ prepare_test() ->
     Query = "select * from test;",
     {ok, P} = educkdb:prepare(Conn, Query),
 
-    {ok, [], []} = x(P),
+    {ok, []} = x(P),
 
     educkdb:disconnect(Conn),
     educkdb:close(Db),
@@ -201,43 +201,41 @@ bind_int_test() ->
     ok = educkdb:bind_int32(Insert, 3, 0),
     ok = educkdb:bind_int64(Insert, 4, 0),
 
-    {ok, _, [[1]]} = x(Insert),
+    {ok, [ #{ data := [1] } ]} = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, 3),
     ok = educkdb:bind_int16(Insert, 2, 3),
     ok = educkdb:bind_int32(Insert, 3, 3),
     ok = educkdb:bind_int64(Insert, 4, 3),
 
-    {ok, _, [[1]]} = x(Insert),
+    {ok, [ #{ data := [1] } ]} = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, -3),
     ok = educkdb:bind_int16(Insert, 2, -3),
     ok = educkdb:bind_int32(Insert, 3, -3),
     ok = educkdb:bind_int64(Insert, 4, -3),
 
-    {ok, _, [[1]]} = x(Insert),
+    {ok, [ #{ data := [1] } ]} = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, ?INT8_MAX),
     ok = educkdb:bind_int16(Insert, 2, ?INT16_MAX),
     ok = educkdb:bind_int32(Insert, 3, ?INT32_MAX),
     ok = educkdb:bind_int64(Insert, 4, ?INT64_MAX),
 
-    {ok, _, [[1]]} = x(Insert),
+    {ok, [ #{ data := [1] } ]} = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, ?INT8_MIN),
     ok = educkdb:bind_int16(Insert, 2, ?INT16_MIN),
     ok = educkdb:bind_int32(Insert, 3, ?INT32_MIN),
     ok = educkdb:bind_int64(Insert, 4, ?INT64_MIN),
 
-    {ok, _, [[1]]} = x(Insert),
+    {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, _, [
-             [?INT8_MIN, ?INT16_MIN, ?INT32_MIN, ?INT64_MIN],
-             [-3,-3,-3,-3],
-             [0,0,0,0],
-             [3,3,3,3],
-             [?INT8_MAX, ?INT16_MAX, ?INT32_MAX, ?INT64_MAX]
-            ]} = educkdb:squery(Conn, "select * from test order by a"),
+    {ok, [ #{ data := [?INT8_MIN, -3, 0, 3, ?INT8_MAX] },
+           #{ data := [?INT16_MIN, -3, 0, 3, ?INT16_MAX] },
+           #{ data := [?INT32_MIN, -3, 0, 3, ?INT32_MAX] },
+           #{ data := [?INT64_MIN, -3, 0, 3, ?INT64_MAX] }
+         ]} = educkdb:squery(Conn, "select * from test order by a"), 
 
     ok.
 
@@ -269,11 +267,12 @@ bind_unsigned_int_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, _, [
-             [0,0,0,0],
-             [ ?INT8_MAX,  ?INT16_MAX,  ?INT32_MAX,  ?INT64_MAX],
-             [?UINT8_MAX, ?UINT16_MAX, ?UINT32_MAX, ?UINT64_MAX]
-            ]} = educkdb:squery(Conn, "select * from test order by a"),
+    {ok, [ #{ data := [0, ?INT8_MAX, ?UINT8_MAX ] },
+           #{ data := [0, ?INT16_MAX, ?UINT16_MAX ] },
+           #{ data := [0, ?INT32_MAX, ?UINT32_MAX ] },
+           #{ data := [0, ?INT64_MAX, ?UINT64_MAX ] }
+         ]} = educkdb:squery(Conn, "select * from test order by a"),
+
     ok.
 
 bind_float_and_double_test() ->
