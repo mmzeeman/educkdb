@@ -33,9 +33,9 @@ CXXFlags =
     end.
 
 [
-    {minimum_otp_vsn, "21.0"},
+    {minimum_otp_vsn, "22.0"},
 
-    {erl_opts, [debug_info, warnings_as_errors]},
+    {erl_opts, [debug_info]},
 
     {xref_checks, [undefined_function_calls,
                    undefined_functions,
@@ -48,7 +48,6 @@ CXXFlags =
         {"darwin", "DRV_LDFLAGS", "-flat_namespace -undefined suppress $ERL_LDFLAGS"},
 
         {"solaris", "CFLAGS", "$CFLAGS -std=c99"},
-
         {"linux", "CFLAGS", "$CFLAGS -std=c11"},
 
         {"CFLAGS", CFlags},
