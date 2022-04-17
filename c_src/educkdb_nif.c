@@ -434,12 +434,6 @@ push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd) {
     return make_ok_tuple(env, ref);
 }
 
-static ERL_NIF_TERM
-make_answer(educkdb_command *cmd, ERL_NIF_TERM answer)
-{
-    return enif_make_tuple3(cmd->env, atom_educkdb, cmd->ref, answer);
-}
-
 static void *
 educkdb_connection_run(void *arg)
 {
@@ -1181,7 +1175,6 @@ static ERL_NIF_TERM
 
 educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
-    idx_t count;
 
     if(argc != 1) {
         return enif_make_badarg(env);
