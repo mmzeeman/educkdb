@@ -117,6 +117,7 @@ static ERL_NIF_TERM atom_true;
 static ERL_NIF_TERM atom_false;
 static ERL_NIF_TERM atom_type;
 static ERL_NIF_TERM atom_data;
+static ERL_NIF_TERM atom_hugeint;
 
 static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
@@ -994,6 +995,44 @@ extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_m
 }
 
 static ERL_NIF_TERM
+extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_hugeint huge = *(vector_data + i);
+            cell = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
+        } else {
+            cell = atom_null;
+        }
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_hugeint huge = *(vector_data + i);
+            //  
+            cell = make_binary(env, (char *) &(huge), sizeof(huge));
+            // cell = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
+        } else {
+            cell = atom_null;
+        }
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
 extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
@@ -1025,7 +1064,7 @@ extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=tuple_count; i-- > 0; ) {
-        ERL_NIF_TERM cell = atom_null;
+        ERL_NIF_TERM cell = make_atom(env, "todo");
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1077,8 +1116,9 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
 
         // Interval
         case DUCKDB_TYPE_INTERVAL:
-        case DUCKDB_TYPE_HUGEINT:
             return extract_data_todo(env, tuple_count);
+        case DUCKDB_TYPE_HUGEINT:
+            return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_VARCHAR:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_BLOB:
@@ -1089,8 +1129,12 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_LIST:
         case DUCKDB_TYPE_STRUCT:
         case DUCKDB_TYPE_MAP:  
+            return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_UUID:
+            // return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
+            return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_JSON:
+            return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         default:
             return extract_data_todo(env, tuple_count);
     }
@@ -2478,6 +2522,7 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_false = make_atom(env, "false");
     atom_type = make_atom(env, "type");
     atom_data = make_atom(env, "data");
+    atom_hugeint = make_atom(env, "hugeint");
 
     return 0;
 }

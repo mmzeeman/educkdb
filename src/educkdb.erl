@@ -18,6 +18,11 @@
 -module(educkdb).
 -author("Maas-Maarten Zeeman <mmzeeman@xs4all.nl>").
 
+-record(hugeint, {
+          upper :: integer(),         %% int64
+          lower :: non_neg_integer()  %% uint64
+}).
+
 %% low-level exports
 -export([
     open/1, open/2,
@@ -86,6 +91,13 @@
     squery/2,
     execute/1
 ]).
+
+%% Utilities
+-export([
+    uuid_binary_to_uuid_string/1,
+    uuid_string_to_uuid_binary/1
+]).
+
 
 %% low-level api
 
@@ -514,4 +526,31 @@ execute(Stmt) ->
         {error, _}=E ->E
     end.
 
+%%
+%% Utilities
+%%
 
+uuid_binary_to_uuid_string(Bin) ->
+    Formatted = io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~2.16.0b~2.16.0b-~12.16.0b", uuid_unpack(Bin)),
+    erlang:iolist_to_binary(Formatted).
+
+
+% Converts a UUID string in the format of 550e8400-e29b-41d4-a716-446655440000
+% (with or without the dashes) to binary.
+uuid_string_to_uuid_binary(U)->
+    uuid_string_to_uuid_binary1(U, <<>>).
+
+uuid_string_to_uuid_binary1(<<>>, Acc) -> Acc;
+uuid_string_to_uuid_binary1(<<$-, Rest/binary>>, Acc) ->
+    uuid_string_to_uuid_binary1(Rest, Acc); 
+uuid_string_to_uuid_binary1(<<A, B, Rest/binary>>, Acc) ->
+    Int = list_to_integer([A,B], 16),
+    uuid_string_to_uuid_binary1(Rest, <<Acc/binary, Int>>).
+
+
+uuid_pack(TL, TM, THV, CSHR, CSL, N) ->
+  <<UUID:128>> = <<TL:32, TM:16, THV:16, CSHR:8, CSL:8, N:48>>,
+  UUID.
+
+uuid_unpack(<<TL:32, TM:16, THV:16, CSHR:8, CSL:8, N:48>>) ->
+  [TL, TM, THV, CSHR, CSL, N].

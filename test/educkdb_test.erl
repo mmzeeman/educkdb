@@ -1045,6 +1045,46 @@ varchar_extract_test() ->
 
     ok.
 
+hugeint_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, []} = educkdb:squery(Conn, "create table test(a hugeint);"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values(0::hugeint)"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values(-1::hugeint)"),
+
+    {ok, [#{ data := [ {hugeint, 0, 0}]  }]} = educkdb:squery(Conn, "select * from test where a = 0"),
+
+    ?assertEqual(0, educkdb:squery(Conn, "select * from test")),
+
+    % ?assertEqual([], {Upper, Lower}),
+
+    ok.
+
+
+uuid_test() ->
+    %% UUID = <<"00112233-4455-6677-8899-aabbccddeeff">>,
+    UUID = <<"550e8400-e29b-41d4-a716-446655440000">>,
+
+    BinUUID = educkdb:uuid_string_to_uuid_binary(UUID),
+
+    ?assertEqual(UUID, educkdb:uuid_binary_to_uuid_string(BinUUID)),
+
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, []} = educkdb:squery(Conn, "create table test(a uuid);"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values('550e8400-e29b-41d4-a716-446655440000')"),
+
+    {ok, [#{ data := [ {hugeint, Upper, Lower}]  }]} = educkdb:squery(Conn, "select * from test"),
+
+    ?assertEqual( [UUID], [integer_to_list(-Upper, 16), integer_to_list(Lower, 16)]),
+
+    % ?assertEqual(UUID, educkdb:uuid_binary_to_uuid_string(DuckBinUUID)),
+
+    ok.
+
+
 %%
 %% Helpers
 %%
