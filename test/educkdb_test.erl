@@ -1052,35 +1052,38 @@ hugeint_test() ->
     {ok, []} = educkdb:squery(Conn, "create table test(a hugeint);"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(0::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(-1::hugeint)"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values(1::hugeint)"),
 
-    {ok, [#{ data := [ {hugeint, 0, 0}]  }]} = educkdb:squery(Conn, "select * from test where a = 0"),
-
-    ?assertEqual(0, educkdb:squery(Conn, "select * from test")),
-
-    % ?assertEqual([], {Upper, Lower}),
+    {ok, [#{ data := [{hugeint, -1, 16#FFFFFFFFFFFFFFFF},
+                      {hugeint,  0,                   0},
+                      {hugeint,  0,                   1}]}
+         ]} = educkdb:squery(Conn, "select * from test where a = 0"),
 
     ok.
 
 
 uuid_test() ->
-    %% UUID = <<"00112233-4455-6677-8899-aabbccddeeff">>,
-    UUID = <<"550e8400-e29b-41d4-a716-446655440000">>,
+    UUID1 = <<"00112233-4455-6677-8899-aabbccddeeff">>,
+    UUID2 = <<"550e8400-e29b-41d4-a716-446655440000">>,
+    UUID3 = <<"ffffffff-ffff-ffff-ffff-ffffffffffff">>,
 
-    BinUUID = educkdb:uuid_string_to_uuid_binary(UUID),
-
-    ?assertEqual(UUID, educkdb:uuid_binary_to_uuid_string(BinUUID)),
+    BinUUID = educkdb:uuid_string_to_uuid_binary(UUID1),
+    ?assertEqual(UUID1, educkdb:uuid_binary_to_uuid_string(BinUUID)),
 
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, []} = educkdb:squery(Conn, "create table test(a uuid);"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values('00112233-4455-6677-8899-aabbccddeeff')"),
     {ok, _} = educkdb:squery(Conn, "insert into test values('550e8400-e29b-41d4-a716-446655440000')"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values('ffffffff-ffff-ffff-ffff-ffffffffffff')"),
+    %% {ok, _} = educkdb:squery(Conn, "insert into test values('00112233-4455-6677-8899-aabbccddeeff')"),
 
-    {ok, [#{ data := [ {hugeint, Upper, Lower}]  }]} = educkdb:squery(Conn, "select * from test"),
+    %% {ok, [#{ data := [ {hugeint, Upper, Lower}]  }]} = educkdb:squery(Conn, "select * from test"),
+    {ok, [#{ data := DuckBinUUIDs }]} = educkdb:squery(Conn, "select * from test order by a"),
 
-    ?assertEqual( [UUID], [integer_to_list(-Upper, 16), integer_to_list(Lower, 16)]),
-
-    % ?assertEqual(UUID, educkdb:uuid_binary_to_uuid_string(DuckBinUUID)),
+    %% ?assertEqual( [UUID], [integer_to_list(Upper, 16), integer_to_list(Lower, 16)]),
+    ?assertEqual([ educkdb:uuid_string_to_uuid_binary(D) || D <- [UUID1, UUID2, UUID3]], DuckBinUUIDs),
 
     ok.
 

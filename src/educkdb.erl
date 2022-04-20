@@ -95,7 +95,10 @@
 %% Utilities
 -export([
     uuid_binary_to_uuid_string/1,
-    uuid_string_to_uuid_binary/1
+    uuid_string_to_uuid_binary/1,
+
+    hugeint_to_integer/1,
+    integer_to_hugeint/1
 ]).
 
 
@@ -529,6 +532,12 @@ execute(Stmt) ->
 %%
 %% Utilities
 %%
+
+hugeint_to_integer({hugeint, Upper, Lower}) ->
+    todo.
+
+integer_to_hugeint(Int) ->
+    {hugeint, 0, 0}.
 
 uuid_binary_to_uuid_string(Bin) ->
     Formatted = io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~2.16.0b~2.16.0b-~12.16.0b", uuid_unpack(Bin)),

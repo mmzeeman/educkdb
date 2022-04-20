@@ -1020,9 +1020,30 @@ extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validit
         ERL_NIF_TERM cell;
         if(validity_mask == NULL || is_valid(validity_mask, i)) {
             duckdb_hugeint huge = *(vector_data + i);
-            //  
-            cell = make_binary(env, (char *) &(huge), sizeof(huge));
-            // cell = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
+            char buf[16];
+
+            // First bit is flipped because of sorting.
+            int64_t upper = huge.upper ^ (((int64_t) 1) << 63);
+
+            buf[0] = upper >> 56 & 0xFF; 
+            buf[1] = upper >> 48 & 0xFF; 
+            buf[2] = upper >> 40 & 0xFF; 
+            buf[3] = upper >> 32 & 0xFF; 
+            buf[4] = upper >> 24 & 0xFF; 
+            buf[5] = upper >> 16 & 0xFF; 
+            buf[6] = upper >>  8 & 0xFF; 
+            buf[7] = upper       & 0xFF; 
+
+            buf[8] =  huge.lower >> 56 & 0xFF; 
+            buf[9] =  huge.lower >> 48 & 0xFF; 
+            buf[10] = huge.lower >> 40 & 0xFF; 
+            buf[11] = huge.lower >> 32 & 0xFF; 
+            buf[12] = huge.lower >> 24 & 0xFF; 
+            buf[13] = huge.lower >> 16 & 0xFF; 
+            buf[14] = huge.lower >>  8 & 0xFF; 
+            buf[15] = huge.lower       & 0xFF; 
+
+            cell = make_binary(env, buf, sizeof(buf));
         } else {
             cell = atom_null;
         }
@@ -1131,8 +1152,8 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_MAP:  
             return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_UUID:
-            // return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
-            return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
+            return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
+            // return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_JSON:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         default:
