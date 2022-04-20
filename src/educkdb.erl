@@ -533,19 +533,20 @@ execute(Stmt) ->
 %% Utilities
 %%
 
+%% @doc Convert a duckdb hugeint record to erlang integer. 
 hugeint_to_integer({hugeint, Upper, Lower}) ->
-    todo.
+    (Upper bsl 64) bor Lower.
 
+%% @doc Convert an erlang integer to a duckdb hugeint.
 integer_to_hugeint(Int) ->
-    {hugeint, 0, 0}.
+    {hugeint, Int bsr 64, Int band 16#FFFFFFFFFFFFFFFF}.
 
+%% @doc Convert a binary represented UUID to a printable hex representation.
 uuid_binary_to_uuid_string(Bin) ->
     Formatted = io_lib:format("~8.16.0b-~4.16.0b-~4.16.0b-~2.16.0b~2.16.0b-~12.16.0b", uuid_unpack(Bin)),
     erlang:iolist_to_binary(Formatted).
 
-
-% Converts a UUID string in the format of 550e8400-e29b-41d4-a716-446655440000
-% (with or without the dashes) to binary.
+%% @doc Convert a printable UUID to a binary representation.
 uuid_string_to_uuid_binary(U)->
     uuid_string_to_uuid_binary1(U, <<>>).
 
@@ -556,10 +557,9 @@ uuid_string_to_uuid_binary1(<<A, B, Rest/binary>>, Acc) ->
     Int = list_to_integer([A,B], 16),
     uuid_string_to_uuid_binary1(Rest, <<Acc/binary, Int>>).
 
-
-uuid_pack(TL, TM, THV, CSHR, CSL, N) ->
-  <<UUID:128>> = <<TL:32, TM:16, THV:16, CSHR:8, CSL:8, N:48>>,
-  UUID.
+%uuid_pack(TL, TM, THV, CSHR, CSL, N) ->
+%  <<UUID:128>> = <<TL:32, TM:16, THV:16, CSHR:8, CSL:8, N:48>>,
+%  UUID.
 
 uuid_unpack(<<TL:32, TM:16, THV:16, CSHR:8, CSL:8, N:48>>) ->
   [TL, TM, THV, CSHR, CSL, N].
