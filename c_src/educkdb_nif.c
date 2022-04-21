@@ -1145,7 +1145,9 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_TIMESTAMP_S:
         case DUCKDB_TYPE_TIMESTAMP_MS:
         case DUCKDB_TYPE_TIMESTAMP_NS:
+            return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_ENUM:
+            return extract_data_utinyint(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_LIST:
         case DUCKDB_TYPE_STRUCT:
         case DUCKDB_TYPE_MAP:  

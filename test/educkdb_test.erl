@@ -1128,7 +1128,18 @@ blob_test() ->
 
     ok.
 
+enum_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
 
+    {ok, []} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
+
+    {ok, [#{ data := [ 1 ], type := enum }]} = educkdb:squery(Conn, "select 'orange'::rainbow"),
+    {ok, [#{ data := [ 0, 1, 2, 3 ], type := enum }]} = educkdb:squery(Conn, "select * from (values ('red'::rainbow), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow))"),
+
+    ok.
+
+    
 %%
 %% Helpers
 %%
