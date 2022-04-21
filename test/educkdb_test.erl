@@ -1107,6 +1107,27 @@ uuid_test() ->
 
     ok.
 
+blob_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, []} = educkdb:squery(Conn, "create table test(a blob);"),
+
+    {ok, [#{ data := [ <<>> ] }]} = educkdb:squery(Conn, "select ''::blob"),
+    {ok, [#{ data := [ <<"1234">> ] }]} = educkdb:squery(Conn, "select '1234'::blob"),
+    {ok, [#{ data := [ <<"abcdefghijklmnopqrstuvwxyz">> ] }]} = educkdb:squery(Conn, "select 'abcdefghijklmnopqrstuvwxyz'::blob"),
+
+    {ok, _} = educkdb:squery(Conn, "insert into test values('00'::blob)"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values(''::blob)"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values('1234'::blob)"),
+
+    ?assertMatch({ok, [#{ data := [0, 2, 4] }]}, educkdb:squery(Conn, "select octet_length(a) from test order by a;")),
+    {ok, [#{ data := Blobs }]} = educkdb:squery(Conn, "select * from test order by a;"),
+
+    ?assertEqual([<<>>, <<"00">>, <<"1234">>], Blobs),
+
+    ok.
+
 
 %%
 %% Helpers

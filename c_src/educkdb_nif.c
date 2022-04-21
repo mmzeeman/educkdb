@@ -1078,8 +1078,6 @@ extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *val
     return data;
 }
 
-
-
 static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1143,6 +1141,7 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_VARCHAR:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_BLOB:
+            return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_TIMESTAMP_S:
         case DUCKDB_TYPE_TIMESTAMP_MS:
         case DUCKDB_TYPE_TIMESTAMP_NS:
@@ -1153,7 +1152,6 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
             return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
-            // return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_JSON:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, tuple_count);
         default:
