@@ -18,10 +18,7 @@
 -module(educkdb).
 -author("Maas-Maarten Zeeman <mmzeeman@xs4all.nl>").
 
--record(hugeint, {
-          upper :: integer(),         %% int64
-          lower :: non_neg_integer()  %% uint64
-}).
+-include("educkdb.hrl").
 
 %% low-level exports
 -export([
@@ -115,6 +112,8 @@
 -type result() :: reference().
 -type appender() :: reference().
 -type data_chunk() :: reference().
+
+-type hugeint() :: #hugeint{}.
 
 -type sql() :: iodata(). 
 
@@ -518,6 +517,7 @@ squery(Connection, Sql) ->
         {ok, Result} ->
             extract_result(Result);
         {error, _}=E ->
+            io:fwrite("Error after query ~p~n", [E]),
             E
     end.
 
@@ -534,12 +534,14 @@ execute(Stmt) ->
 %%
 
 %% @doc Convert a duckdb hugeint record to erlang integer. 
-hugeint_to_integer({hugeint, Upper, Lower}) ->
+-spec hugeint_to_integer(hugeint()) -> integer().
+hugeint_to_integer(#hugeint{upper=Upper, lower=Lower}) ->
     (Upper bsl 64) bor Lower.
 
 %% @doc Convert an erlang integer to a duckdb hugeint.
+-spec integer_to_hugeint(integer()) -> hugeint().
 integer_to_hugeint(Int) ->
-    {hugeint, Int bsr 64, Int band 16#FFFFFFFFFFFFFFFF}.
+    #hugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.
 
 %% @doc Convert a binary represented UUID to a printable hex representation.
 uuid_binary_to_uuid_string(Bin) ->

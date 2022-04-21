@@ -45,9 +45,9 @@ educk_db_version_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     ?assertEqual({ok, [ #{ name => <<"library_version">>, type => varchar,
-                           data => [<<"v0.3.3">>] },
+                           data => [<<"v0.3.4-dev77">>] },
                         #{ name => <<"source_id">>, type => varchar,
-                           data => [<<"fe9ba8003">>]} ]},
+                           data => [<<"6f659fd98">>]} ]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -1051,23 +1051,39 @@ hugeint_test() ->
 
     {ok, []} = educkdb:squery(Conn, "create table test(a hugeint);"),
 
-    A = educkdb:integer_to_hugeint(-1111),
-    B = educkdb:integer_to_hugeint(-1),
-    C = educkdb:integer_to_hugeint(0),
-    D = educkdb:integer_to_hugeint(1),
-    E = educkdb:integer_to_hugeint(1111),
 
+    A = educkdb:integer_to_hugeint(-170141183460469231731687303715884105727),
+    B = educkdb:integer_to_hugeint(-1111),
+    C = educkdb:integer_to_hugeint(-1),
+    D = educkdb:integer_to_hugeint(0),
+    E = educkdb:integer_to_hugeint(1),
+    F = educkdb:integer_to_hugeint(1111),
+
+    ?assertEqual({hugeint, -9223372036854775808, 1}, A), 
+    ?assertEqual({hugeint, -1, 18446744073709550505}, B), 
+    ?assertEqual({hugeint, -1, 18446744073709551615}, C), 
+    ?assertEqual({hugeint, 0, 0}, D), 
+    ?assertEqual({hugeint, 0, 1}, E), 
+    ?assertEqual({hugeint, 0, 1111}, F), 
+
+
+    ?assertMatch({ok, [ #{data := [{hugeint, -9223372036854775808, 1}] } ]},
+                 educkdb:squery(Conn, "SELECT -170141183460469231731687303715884105727::hugeint")),
+
+    ?assertMatch({ok, [ #{data := [{hugeint, -9223372036854775808, 1}] } ]},
+                 educkdb:squery(Conn, "SELECT * FROM (values (-170141183460469231731687303715884105727::hugeint))")),
+
+    {ok, _} = educkdb:squery(Conn, "insert into test values(-170141183460469231731687303715884105727::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(-1111::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(-1::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(0::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(1::hugeint)"),
     {ok, _} = educkdb:squery(Conn, "insert into test values(1111::hugeint)"),
 
-    {ok, [ #{ data := [ A, B, C, D, E ] }
+    {ok, [ #{ data := [ A, B, C, D, E, F ] }
          ]} = educkdb:squery(Conn, "select * from test order by a"),
 
     ok.
-
 
 uuid_test() ->
     UUID1 = <<"00112233-4455-6677-8899-aabbccddeeff">>,
