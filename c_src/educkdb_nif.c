@@ -89,6 +89,12 @@ typedef union {
     } inlined;
 } duckdb_string_t;
 
+// Not exported for c api. Search for list_entry_t in header files.
+typedef struct {
+    uint64_t offset;
+    uint64_t length;
+} duckdb_list_entry_t;
+
 typedef enum {
     cmd_unknown,
 
@@ -1161,6 +1167,37 @@ extract_data_enum(ErlNifEnv *env, duckdb_logical_type logical_type, void *vector
     }
 }
 
+/**
+ * Complex nested types.
+ */
+
+static ERL_NIF_TERM extract_data(ErlNifEnv *, duckdb_logical_type, duckdb_vector, idx_t);
+ 
+static ERL_NIF_TERM
+extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, duckdb_list_entry_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    printf("\n\rdata-list: tuple_count %llu:  vector_data: %d\n\r", tuple_count, vector_data);
+
+    duckdb_vector child_vector = duckdb_list_vector_get_child(vector);
+    duckdb_logical_type list_child_type = duckdb_list_type_child_type(logical_type);
+    duckdb_type list_child_type_id = duckdb_get_type_id(list_child_type);
+
+    idx_t list_size = duckdb_list_vector_get_size(vector);
+
+    printf("child_type: %s, size: %d\n\r", duckdb_type_name(list_child_type_id), list_size);
+
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        duckdb_list_entry_t entry = *(vector_data + i);
+        printf(" vector-entry: %d %d-%d\n\r", i, entry.offset, entry.length);
+        ERL_NIF_TERM cell = extract_data(env, list_child_type, child_vector, list_size);
+        data = enif_make_list_cell(env, cell, data);
+    }
+    duckdb_destroy_logical_type(&list_child_type);
+
+    return data;
+}
+
 static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1174,11 +1211,7 @@ extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
 }
 
 static ERL_NIF_TERM
-extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vector, idx_t tuple_count) {
-    void *data = duckdb_vector_get_data(vector);
-    uint64_t *validity_mask = duckdb_vector_get_validity(vector);
-    duckdb_type type_id = duckdb_get_type_id(logical_type);
-
+internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, duckdb_type type_id, void *data, uint64_t *validity_mask, idx_t tuple_count) {
     switch(type_id) {
         case DUCKDB_TYPE_BOOLEAN:
             return extract_data_boolean(env, (bool *) data, validity_mask, tuple_count);
@@ -1233,6 +1266,8 @@ extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vec
         case DUCKDB_TYPE_ENUM:
             return extract_data_enum(env, logical_type, data, validity_mask, tuple_count);
         case DUCKDB_TYPE_LIST:
+            // return extract_data_todo(env, tuple_count);
+            return extract_data_list(env, vector, logical_type, (duckdb_list_entry_t *) data, validity_mask, tuple_count);
         case DUCKDB_TYPE_STRUCT:
         case DUCKDB_TYPE_MAP:  
             return extract_data_todo(env, tuple_count);
@@ -1243,6 +1278,15 @@ extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vec
         default:
             return extract_data_todo(env, tuple_count);
     }
+}
+
+static ERL_NIF_TERM
+extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vector, idx_t tuple_count) {
+    void *data = duckdb_vector_get_data(vector);
+    uint64_t *validity_mask = duckdb_vector_get_validity(vector);
+    duckdb_type type_id = duckdb_get_type_id(logical_type); 
+
+    return internal_extract_data(env, vector, logical_type, type_id, data, validity_mask, tuple_count);
 }
 
 static ERL_NIF_TERM

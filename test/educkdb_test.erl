@@ -1135,13 +1135,28 @@ enum_test() ->
     {ok, []} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
 
     {ok, [#{ data := [ <<"orange">> ], type := enum }]} = educkdb:squery(Conn, "select 'orange'::rainbow"),
-
     {ok, [#{ data := [ <<"red">>, null, <<"orange">>, <<"yellow">>, <<"green">> ], type := enum }]}
       = educkdb:squery(Conn, "select * from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow))"),
 
     ok.
 
-    
+list_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    %% Simple lists
+    ?assertMatch({ok, [#{ data := [ [1,2,3,4] ]}]},
+                 educkdb:squery(Conn, "SELECT [1, 2, 3, 4];")),
+    ?assertMatch({ok, [#{ data := [ [1,2, null, 4] ]}]},
+                 educkdb:squery(Conn, "SELECT [1, 2, null, 4];")),
+    ?assertMatch({ok, [#{ data := [ [<<"one">>, <<"two">>, null, <<"three">>] ]}]},
+                 educkdb:squery(Conn, "SELECT ['one', 'two', null, 'three'];")),
+
+    %% Nested lists
+    ?assertMatch({ok, [#{ data := [ [ [10, 20], [1,2,3, 4], [1] ] ]}]},
+                 educkdb:squery(Conn, "SELECT [ [10, 20], [1,2,3,4], [1] ];")),
+    ok.
+
 %%
 %% Helpers
 %%
