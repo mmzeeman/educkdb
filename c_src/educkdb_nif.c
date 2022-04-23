@@ -1079,6 +1079,89 @@ extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *val
 }
 
 static ERL_NIF_TERM
+extract_data_uint8_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint8_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            uint8_t enum_index = *(vector_data + i);
+            char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
+            cell = make_binary(env, value, strlen(value));
+            duckdb_free(value);
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_uint16_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint16_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            uint16_t enum_index = *(vector_data + i);
+            char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
+            cell = make_binary(env, value, strlen(value));
+            duckdb_free(value);
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
+extract_data_uint32_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint32_t *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=tuple_count; i-- > 0; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            uint32_t enum_index = *(vector_data + i);
+            char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
+            cell = make_binary(env, value, strlen(value));
+            duckdb_free(value);
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+
+
+static ERL_NIF_TERM
+extract_data_enum(ErlNifEnv *env, duckdb_logical_type logical_type, void *vector_data, uint64_t *validity_mask, idx_t tuple_count) {
+    duckdb_type enum_internal_type_id  = duckdb_enum_internal_type(logical_type);
+
+    switch(enum_internal_type_id) {
+        case DUCKDB_TYPE_UTINYINT:
+            return extract_data_uint8_enum(env, logical_type, (uint8_t *) vector_data, validity_mask, tuple_count);
+        case DUCKDB_TYPE_USMALLINT:
+            return extract_data_uint16_enum(env, logical_type, (uint16_t *) vector_data, validity_mask, tuple_count);
+        case DUCKDB_TYPE_UINTEGER:
+            return extract_data_uint32_enum(env, logical_type, (uint32_t *) vector_data, validity_mask, tuple_count);
+        default:
+            return enif_raise_exception(env, make_atom(env, "unexpected_internal_type"));
+    }
+}
+
+static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
@@ -1091,9 +1174,10 @@ extract_data_todo(ErlNifEnv *env, idx_t tuple_count) {
 }
 
 static ERL_NIF_TERM
-extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tuple_count) {
+extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vector, idx_t tuple_count) {
     void *data = duckdb_vector_get_data(vector);
     uint64_t *validity_mask = duckdb_vector_get_validity(vector);
+    duckdb_type type_id = duckdb_get_type_id(logical_type);
 
     switch(type_id) {
         case DUCKDB_TYPE_BOOLEAN:
@@ -1145,7 +1229,9 @@ extract_data(ErlNifEnv *env, duckdb_type type_id, duckdb_vector vector, idx_t tu
         case DUCKDB_TYPE_TIMESTAMP_S:
         case DUCKDB_TYPE_TIMESTAMP_MS:
         case DUCKDB_TYPE_TIMESTAMP_NS:
+            return extract_data_todo(env, tuple_count);
         case DUCKDB_TYPE_ENUM:
+            return extract_data_enum(env, logical_type, data, validity_mask, tuple_count);
         case DUCKDB_TYPE_LIST:
         case DUCKDB_TYPE_STRUCT:
         case DUCKDB_TYPE_MAP:  
@@ -1163,15 +1249,14 @@ static ERL_NIF_TERM
 extract_vector(ErlNifEnv *env, duckdb_vector vector, idx_t tuple_count) {
     ERL_NIF_TERM vector_map = enif_make_new_map(env);
     duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
-
-    // Type
     duckdb_type type_id = duckdb_get_type_id(logical_type);
+
     const char *type_name = duckdb_type_name(type_id);
     ERL_NIF_TERM type_atom = make_atom(env, type_name);
     if(enif_make_map_put(env, vector_map, atom_type, type_atom, &vector_map)) { }
 
     // Data
-    ERL_NIF_TERM data = extract_data(env, type_id, vector, tuple_count);
+    ERL_NIF_TERM data = extract_data(env, logical_type, vector, tuple_count);
     if(enif_make_map_put(env, vector_map, atom_data, data, &vector_map)) { }
 
     duckdb_destroy_logical_type(&logical_type);
