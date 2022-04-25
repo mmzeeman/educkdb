@@ -1189,7 +1189,11 @@ extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logi
 
     for(idx_t i=tuple_count; i-- > 0; ) {
         duckdb_list_entry_t entry = *(vector_data + i);
+
         printf(" vector-entry: %d %d-%d\n\r", i, entry.offset, entry.length);
+
+        // offset, length
+
         ERL_NIF_TERM cell = extract_data(env, list_child_type, child_vector, list_size);
         data = enif_make_list_cell(env, cell, data);
     }
