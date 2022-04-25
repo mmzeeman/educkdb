@@ -1199,6 +1199,24 @@ extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logi
 }
 
 static ERL_NIF_TERM
+extract_data_struct(ErlNifEnv *env, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
+    printf("\n\rstruct %llu %llu\n\r", offset, count);
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=count+offset; i-- > offset; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            cell = atom_ok;
+        } else {
+            cell = atom_null;
+        }
+    }
+
+    return data;
+}
+
+static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
@@ -1266,9 +1284,9 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
         case DUCKDB_TYPE_ENUM:
             return extract_data_enum(env, logical_type, data, validity_mask, offset, count);
         case DUCKDB_TYPE_LIST:
-            // return extract_data_todo(env, tuple_count);
             return extract_data_list(env, vector, logical_type, (duckdb_list_entry_t *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_STRUCT:
+            return extract_data_struct(env, validity_mask, offset, count);
         case DUCKDB_TYPE_MAP:  
             return extract_data_todo(env, offset, count);
         case DUCKDB_TYPE_UUID:

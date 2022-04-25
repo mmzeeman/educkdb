@@ -1166,6 +1166,15 @@ list_test() ->
 
     ok.
 
+struct_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    ?assertMatch(ok,
+                 educkdb:squery(Conn, "SELECT {'x': 1, 'y': 2, 'z': 3};")),
+
+    ok.
+
 %%
 %% Helpers
 %%
