@@ -1155,6 +1155,15 @@ list_test() ->
     %% Nested lists
     ?assertMatch({ok, [#{ data := [ [ [10, 20], [1,2,3, 4], [1] ] ]}]},
                  educkdb:squery(Conn, "SELECT [ [10, 20], [1,2,3,4], [1] ];")),
+
+    %% With null values
+    ?assertMatch({ok, [#{ data := [ [ [10, 20], null, [1] ] ]}]},
+                 educkdb:squery(Conn, "SELECT [ [10, 20], null, [1] ];")),
+
+    %% With null values
+    ?assertMatch({ok, [#{ data := [ [ [[10, 20]], [null], [[1]] ] ]}]},
+                 educkdb:squery(Conn, "SELECT [ [ [10, 20] ], [null], [[1]] ];")),
+
     ok.
 
 %%
