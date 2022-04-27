@@ -1171,7 +1171,36 @@ struct_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     ?assertMatch(ok,
+                 educkdb:squery(Conn, "SELECT [{'x': 1, 'y': 2, 'z': 3}, {'x': 100, 'y': 200, 'z': 300} ];")),
+
+    ?assertMatch(ok,
                  educkdb:squery(Conn, "SELECT {'x': 1, 'y': 2, 'z': 3};")),
+
+    ok.
+
+struct_table_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, []} = educkdb:squery(Conn, "create table test(a row(i integer, j integer));"),
+
+    ?assertMatch({ok, []}, educkdb:squery(Conn, "SELECT * from test;")),
+
+    {ok, _} = educkdb:squery(Conn, "insert into test values (null);"),
+
+    ?assertMatch({ok, [#{ data := [null],
+                          name := <<"a">>,
+                          type := struct }]},
+                 educkdb:squery(Conn, "SELECT * from test;")),
+
+    {ok, _} = educkdb:squery(Conn, "insert into test values ({i: 10, j: 20});"),
+    {ok, _} = educkdb:squery(Conn, "insert into test values ({i: 123, j: 456});"),
+
+    ?assertMatch({ok, [#{ data := [null, #{<<"i">> := 10, <<"j">> := 20}, #{ <<"i">> := 123, <<"j">> := 456} ],
+                          name := <<"a">>,
+                          type := struct }]},
+                 educkdb:squery(Conn, "SELECT * from test order by a.i;")),
+
 
     ok.
 
