@@ -1218,7 +1218,7 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
                 ERL_NIF_TERM key = make_binary(env, child_name, strlen(child_name));
                 ERL_NIF_TERM list = extract_data(env, child_type, child_vector, i, 1);
                 ERL_NIF_TERM value, tail;
-                enif_get_list_cell(env, list_result, &value, &tail);
+                enif_get_list_cell(env, list, &value, &tail);
 
                 enif_make_map_put(env, cell, key, value, &cell);
 
