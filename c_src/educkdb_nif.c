@@ -1197,6 +1197,7 @@ extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logi
     return data;
 }
 
+
 static ERL_NIF_TERM
 extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1235,6 +1236,42 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
     return data;
 }
 
+static ERL_NIF_TERM
+extract_data_map(ErlNifEnv *env, duckdb_vector vector,  duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    idx_t child_count = duckdb_struct_type_child_count(logical_type);
+    printf("\n\rmap child count %llu\n\r", child_count);
+
+    for(idx_t i=count+offset; i-- > offset; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            cell = enif_make_new_map(env);
+
+            for(idx_t j=0; j < child_count; j++) {
+                duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, j);
+                duckdb_vector child_vector = duckdb_struct_vector_get_child(vector, j);
+                
+                ERL_NIF_TERM list = extract_data(env, child_type, child_vector, i, 1);
+                ERL_NIF_TERM value, tail;
+                enif_get_list_cell(env, list, &value, &tail);
+
+
+                enif_make_map_put(env, cell, enif_make_int64(env, j), value, &cell);
+
+                duckdb_destroy_logical_type(&child_type);
+            }
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+ 
 static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1307,7 +1344,7 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
         case DUCKDB_TYPE_STRUCT:
             return extract_data_struct(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_MAP:  
-            return extract_data_todo(env, offset, count);
+            return extract_data_map(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_JSON:

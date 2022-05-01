@@ -1205,6 +1205,19 @@ struct_table_test() ->
 
     ok.
 
+map_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    ?assertMatch({ok, [#{ data := [
+                                   [ #{}, #{} ]
+                                  ]}] },
+                 educkdb:squery(Conn, "SELECT map([1, 5, 1], ['a', 'e', 'b']);")),
+
+
+    ok.
+
+
 %%
 %% Helpers
 %%
