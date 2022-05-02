@@ -1240,28 +1240,28 @@ static ERL_NIF_TERM
 extract_data_map(ErlNifEnv *env, duckdb_vector vector,  duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
-    idx_t child_count = duckdb_struct_type_child_count(logical_type);
-    printf("\n\rmap child count %llu\n\r", child_count);
-
     for(idx_t i=count+offset; i-- > offset; ) {
         ERL_NIF_TERM cell;
 
         if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_new_map(env);
+            duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, 0);
+            duckdb_logical_type value_child_type = duckdb_struct_type_child_type(logical_type, 1);
 
-            for(idx_t j=0; j < child_count; j++) {
-                duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, j);
-                duckdb_vector child_vector = duckdb_struct_vector_get_child(vector, j);
+            duckdb_vector key_child_vector = duckdb_struct_vector_get_child(vector, 0);
+            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
                 
-                ERL_NIF_TERM list = extract_data(env, child_type, child_vector, i, 1);
-                ERL_NIF_TERM value, tail;
-                enif_get_list_cell(env, list, &value, &tail);
+            ERL_NIF_TERM list, keys, values, tail;
 
+            list = extract_data(env, key_child_type, key_child_vector, i, 1);
+            enif_get_list_cell(env, list, &keys, &tail);
 
-                enif_make_map_put(env, cell, enif_make_int64(env, j), value, &cell);
+            list = extract_data(env, value_child_type, value_child_vector, i, 1);
+            enif_get_list_cell(env, list, &values, &tail);
 
-                duckdb_destroy_logical_type(&child_type);
-            }
+            duckdb_destroy_logical_type(&key_child_type);
+            duckdb_destroy_logical_type(&value_child_type);
+
+            cell = enif_make_tuple3(env, make_atom(env, "map"), keys, values);
         } else {
             cell = atom_null;
         }
