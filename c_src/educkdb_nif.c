@@ -34,8 +34,6 @@
 #define DAY_EPOCH 719528            /* days since {0, 1, 1} -> {1970, 1, 1} */
 #define MICS_EPOCH 62167219200000000    
 
-#define CHUNK_SIZE 500             /* The target number of cells to get from a query result in one step before yielding */
-
 #define NIF_NAME "educkdb_nif"
 
 static ErlNifResourceType *educkdb_database_type = NULL;
