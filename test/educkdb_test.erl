@@ -19,6 +19,7 @@
 -module(educkdb_test).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("educkdb/include/educkdb.hrl").
 
 -define(DB1, "./test/dbs/temp_db1.db").
 -define(DB2, "./test/dbs/temp_db2.db").
@@ -1204,6 +1205,17 @@ struct_table_test() ->
 
 
     ok.
+
+map_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    ?assertMatch({ok, [#{ data := [ #map{ keys = [1, 5, 1, 12], values = [<<"a">>, <<"e">>, <<"b">>, <<"c">>]} ] } ]},
+                 educkdb:squery(Conn, "SELECT map([1, 5, 1, 12], ['a', 'e', 'b', 'c']);")),
+
+
+    ok.
+
 
 %%
 %% Helpers

@@ -34,8 +34,6 @@
 #define DAY_EPOCH 719528            /* days since {0, 1, 1} -> {1970, 1, 1} */
 #define MICS_EPOCH 62167219200000000    
 
-#define CHUNK_SIZE 500             /* The target number of cells to get from a query result in one step before yielding */
-
 #define NIF_NAME "educkdb_nif"
 
 static ErlNifResourceType *educkdb_database_type = NULL;
@@ -1197,6 +1195,7 @@ extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logi
     return data;
 }
 
+
 static ERL_NIF_TERM
 extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1235,6 +1234,42 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
     return data;
 }
 
+static ERL_NIF_TERM
+extract_data_map(ErlNifEnv *env, duckdb_vector vector,  duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
+    ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    for(idx_t i=count+offset; i-- > offset; ) {
+        ERL_NIF_TERM cell;
+
+        if(validity_mask == NULL || is_valid(validity_mask, i)) {
+            duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, 0);
+            duckdb_logical_type value_child_type = duckdb_struct_type_child_type(logical_type, 1);
+
+            duckdb_vector key_child_vector = duckdb_struct_vector_get_child(vector, 0);
+            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
+                
+            ERL_NIF_TERM list, keys, values, tail;
+
+            list = extract_data(env, key_child_type, key_child_vector, i, 1);
+            enif_get_list_cell(env, list, &keys, &tail);
+
+            list = extract_data(env, value_child_type, value_child_vector, i, 1);
+            enif_get_list_cell(env, list, &values, &tail);
+
+            duckdb_destroy_logical_type(&key_child_type);
+            duckdb_destroy_logical_type(&value_child_type);
+
+            cell = enif_make_tuple3(env, make_atom(env, "map"), keys, values);
+        } else {
+            cell = atom_null;
+        }
+
+        data = enif_make_list_cell(env, cell, data);
+    }
+
+    return data;
+}
+ 
 static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
@@ -1307,7 +1342,7 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
         case DUCKDB_TYPE_STRUCT:
             return extract_data_struct(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_MAP:  
-            return extract_data_todo(env, offset, count);
+            return extract_data_map(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_JSON:
