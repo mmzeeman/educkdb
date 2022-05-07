@@ -26,13 +26,6 @@ clean: $(REBAR3)
 distclean:
 	rm $(REBAR3)
 
-# dializer
-
-build-plt:
-	@$(DIALYZER) --build_plt --output_plt .$(PROJECT).plt \
-		--apps kernel stdlib
-
-dialyze:
-	@$(DIALYZER) --src src --plt .$(PROJECT).plt --no_native \
-		-Werror_handling -Wrace_conditions -Wunmatched_returns -Wunderspecs
+dialyzer: $(REBAR3)
+	$(REBAR3) dialyzer
 

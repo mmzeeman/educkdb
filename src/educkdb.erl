@@ -1,3 +1,11 @@
+%% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% @copyright 2022 Maas-Maarten Zeeman
+%%
+%% @doc Low level erlang API for duckdb databases.
+%% @end
+
+%% Copyright 2022 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
@@ -9,16 +17,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%
-%% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022 Maas-Maarten Zeeman
-%%
-%% @doc Low level erlang API for duckdb databases.
 
 -module(educkdb).
 -author("Maas-Maarten Zeeman <mmzeeman@xs4all.nl>").
 
--include("educkdb.hrl").
 
 %% low-level exports
 -export([
@@ -89,6 +91,7 @@
     execute/1
 ]).
 
+
 %% Utilities
 -export([
     uuid_binary_to_uuid_string/1,
@@ -98,13 +101,14 @@
     integer_to_hugeint/1
 ]).
 
-
 %% low-level api
 
 -export([
     query_cmd/2,
     execute_prepared_cmd/1
 ]).
+
+-include("educkdb.hrl").
 
 -type database() :: reference().
 -type connection() :: reference().
@@ -156,19 +160,23 @@ init() ->
                   end,
     ok = erlang:load_nif(NifFileName, 0).
 
-
 %%
 %% Startup & Configure
 %%
 
 %% @doc Open, or create a duckdb database with default options.
-%%
+-spec open(Filename) -> Result
+    when Filename :: string(),
+         Result :: {ok, database()} | {error, _}.
 open(Filename) ->
     open(Filename, #{}).
 
 %% @doc Open, or create a duckdb file
 %%
-% -spec open(, map()) -> {ok, database()} | {error, _}.
+-spec open(Filename, Options) -> Result
+    when Filename :: string(),
+         Options :: map(),
+         Result :: {ok, database()} | {error, _}.
 open(_Filename, _Options) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -176,7 +184,9 @@ open(_Filename, _Options) ->
 %%      is used by long running commands. Note: It is adviced to use the
 %%      connection in a single process.
 %%
--spec connect(database()) -> {ok, connection()} | {error, _}.
+-spec connect(Database) -> Result
+    when Database :: database(),
+         Result :: {ok, connection()} | {error, _}.
 connect(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -184,17 +194,22 @@ connect(_Db) ->
 %% @doc Disconnect from the database. Stops the thread.
 %%      The calling pid will receive:
 %%      {disconnect, Ref, ok | {error, _}}.
--spec disconnect(connection()) -> ok | {error, _}.
+-spec disconnect(Connection) -> Result
+    when Connection :: connection(),
+         Result :: ok | {error, _}.
 disconnect(_Connection) ->
     erlang:nif_error(nif_library_not_loaded).
                                  
 %% @doc Close the database. All open connections will become unusable.
--spec close(database()) -> ok | {error, _}.
+-spec close(Database) -> Result
+    when Database :: database(),
+         Result :: ok | {error, _}.
 close(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
  
 
-%% @doc Return a list with config flags, and explanation
+%% @doc Return a list with config flags, and explanations. The options
+%%      can vary depending on the underlying DuckDB version used.
 -spec config_flag_info() -> map().
 config_flag_info() ->
     erlang:nif_error(nif_library_not_loaded).
@@ -233,6 +248,10 @@ query_cmd(_Conn, _Sql) ->
 prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
+
+-spec execute_prepared(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, result()} | {error, _}.
 execute_prepared(PreparedStatement) ->
     case execute_prepared_cmd(PreparedStatement) of
         {ok, Ref} ->
@@ -244,7 +263,9 @@ execute_prepared(PreparedStatement) ->
             E
     end.
 
--spec execute_prepared_cmd(prepared_statement()) -> bind_response().
+-spec execute_prepared_cmd(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, reference()} | {error, _}.
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
 
