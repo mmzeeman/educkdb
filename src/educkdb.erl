@@ -119,6 +119,8 @@
 
 -type hugeint() :: #hugeint{}.
 
+-type second() :: float(). %% in the range 0.0..60.0
+
 -type sql() :: iodata(). 
 
 -type idx() :: 0..16#FFFFFFFFFFFFFFFF. 
@@ -273,7 +275,12 @@ execute_prepared(PreparedStatement) ->
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_boolean(prepared_statement(), idx(), boolean()) -> bind_response().
+%% @doc Bind a boolean to the prepared statement at the specified index.
+-spec bind_boolean(PreparedStatement, Index, Boolean) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(), 
+         Boolean :: boolean(),
+         BindResponse :: bind_response().
 bind_boolean(Statement, Index, true) ->
     bind_boolean_intern(Statement, Index, 1);
 bind_boolean(Statement, Index, false) ->
@@ -283,47 +290,109 @@ bind_boolean(Statement, Index, false) ->
 bind_boolean_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int8(prepared_statement(), idx(), int8()) -> bind_response().
+
+%% @doc Bind an int8 to the prepared statement at the specified index.
+-spec bind_int8(PreparedStatement, Index, Int8) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int8 :: int8(),
+         BindResponse :: bind_response().
 bind_int8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int16(prepared_statement(), idx(), int16()) -> bind_response().
+%% @doc Bind an int16 to the prepared statement at the specified index.
+-spec bind_int16(PreparedStatement, Index, Int16) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int16 :: int16(),
+         BindResponse :: bind_response().
 bind_int16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int32(prepared_statement(), idx(), int32()) -> bind_response().
+%% @doc Bind an int32 to the prepared statement at the specified index.
+-spec bind_int32(PreparedStatement, Index, Int32) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int32 :: int32(),
+         BindResponse :: bind_response().
 bind_int32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int64(prepared_statement(), idx(), int64()) -> bind_response().
+%% @doc Bind an int64 to the prepared statement at the specified index.
+-spec bind_int64(PreparedStatement, Index, Int64) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int64 :: int64(),
+         BindResponse :: bind_response().
 bind_int64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint8(prepared_statement(), idx(), uint8()) -> bind_response().
+%% @doc Bind an uint8 to the prepared statement at the specified index.
+-spec bind_uint8(PreparedStatement, Index, UInt8) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt8 :: uint8(),
+         BindResponse :: bind_response().
 bind_uint8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint16(prepared_statement(), idx(), uint16()) -> bind_response().
+%% @doc Bind an uint8 to the prepared statement at the specified index.
+-spec bind_uint16(PreparedStatement, Index, UInt16) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt16 :: uint16(),
+         BindResponse :: bind_response().
 bind_uint16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint32(prepared_statement(), idx(), uint32()) -> bind_response().
+%% @doc Bind an uint32 to the prepared statement at the specified index.
+-spec bind_uint32(PreparedStatement, Index, UInt32) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt32 :: uint32(),
+         BindResponse :: bind_response().
 bind_uint32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint64(prepared_statement(), idx(), uint64()) -> bind_response().
+%% @doc Bind an uint64 to the prepared statement at the specified index.
+-spec bind_uint64(PreparedStatement, Index, UInt64) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt64 :: uint64(),
+         BindResponse :: bind_response().
 bind_uint64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_float(prepared_statement(), idx(), float()) -> bind_response().
+%% @doc Bind an float to the prepared statement at the specified index. Note: Erlang's
+%%      float() datatype is actually a DuckDB double. When binding an Erlang float
+%%      variable you will lose precision.
+-spec bind_float(PreparedStatement, Index, Float) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Float :: float(),
+         BindResponse :: bind_response().
 bind_float(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_double(prepared_statement(), idx(), float()) -> bind_response().
+%% @doc Bind an uint64 to the prepared statement at the specified index. Note: Erlang's
+%%      float datatype is a DuckDB double. Using this function allows you to keep the
+%%      precision.
+-spec bind_double(PreparedStatement, Index, Double) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Double :: float(),
+         BindResponse :: bind_response().
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a date to the prepared statement at the specified index. The date can be 
+%%      either given as a calendar:date() tuple, or an integer with the number of 
+%%      days since the first of January in the year 0.
+-spec bind_date(PreparedStatement, Index, Date) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Date :: calendar:date() | integer(),
+         BindResponse :: bind_response().
 bind_date(Stmt, Index, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
     bind_date_intern(Stmt, Index, calendar:date_to_gregorian_days(Date));
 bind_date(Stmt, Index, Days) when is_integer(Days) ->
@@ -333,7 +402,14 @@ bind_date(Stmt, Index, Days) when is_integer(Days) ->
 bind_date_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a time to the prepared statement at the specified index. The time can be either
+%%      given as an {hour, minute, second} tuple (similar to calendar:time()), or as an integer
+%%      with the number of microseconds since midnight.
+-spec bind_time(PreparedStatement, Index, Time) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Time :: calendar:time() | {calendar:hour(), calendar:minute(), second()} | non_neg_integer(),
+         BindResponse :: bind_response().
 bind_time(Stmt, Index, {H, M, S}) -> 
     bind_time_intern(Stmt, Index, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
 bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
