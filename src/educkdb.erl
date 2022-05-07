@@ -208,26 +208,30 @@ close(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
  
 
-%% @doc Return a list with config flags, and explanations. The options
+%% @doc Return a map with config flags, and explanations. The options
 %%      can vary depending on the underlying DuckDB version used.
+%%      For more information about DuckDB configuration options, see: 
+%%      <a href="https://duckdb.org/docs/sql/configuration" target="_parent" rel="noopener">DuckDB Configuration</a>.
 -spec config_flag_info() -> map().
 config_flag_info() ->
     erlang:nif_error(nif_library_not_loaded).
- 
+
 %%
 %% Query
 %%
 
 %% @doc Query the database. The answer the answer is returned immediately. 
-%% Special care has been taken to prevent blocking the scheduler. A reference
-%% to a result data structure will be returned. 
--spec query(connection(), sql()) -> {ok, result()} | {error, _}.
+%%      Special care has been taken to prevent blocking the scheduler. A reference
+%%      to a result data structure will be returned. 
+-spec query(Connection, Sql) -> Result
+    when Connection :: connection(),
+         Sql :: sql(),
+         Result :: {ok, result()} | {error, _}.
 query(Conn, Sql) ->
     case query_cmd(Conn, Sql) of
         {ok, Ref} ->
             receive 
-                {educkdb, Ref, Answer} ->
-                    Answer
+                {educkdb, Ref, Answer} -> Answer
             end;
         {error, _}=E ->
             E
@@ -365,23 +369,35 @@ bind_null(_Stmt, _Index) ->
 %%
 %% Results
 %%
-%%
--spec get_chunks(result()) -> [data_chunk()]. 
+
+%% @doc Get all data chunks from a query result.
+-spec get_chunks(QueryResult) -> DataChunks
+    when QueryResult :: result(),
+         DataChunks :: list(data_chunk()).
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
- -spec get_chunk(result(), uint64()) -> {ok, data_chunk()} | {error, _}. 
+%% @doc Get a data chunk from a query result.
+ -spec get_chunk(QueryResult, Idx) -> DataChunk 
+    when QueryResult :: result(),
+         Idx :: non_neg_integer(),
+         DataChunk :: data_chunk().
 get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec chunk_count(result()) -> uint64().
+%% @doc Get the number of data chunks in a query result.
+-spec chunk_count(QueryResult) -> Count
+    when QueryResult :: result(),
+         Count :: uint64().
 chunk_count(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec column_names(result()) -> [binary()].
+%% @doc Get the column names from the query result.
+-spec column_names(QueryResult) -> Names 
+    when QueryResult :: result(),
+         Names :: list(binary()).
 column_names(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
-
 
 %%
 %% Chunks
@@ -513,30 +529,25 @@ appender_end_row(_Appender) ->
 %% Higher Level API
 %%
 
-%% @doc Extra
-extract_result(Result) ->
-    extract_result1(Result, chunk_count(Result)).
+%% @doc Extract a query result of the first data chunk.
+-spec extract_result(QueryResult) -> Chunks
+    when QueryResult :: result(),
+         Chunks :: list().
+extract_result(QueryResult) ->
+    extract_result1(QueryResult, chunk_count(QueryResult)).
 
-extract_result1(_Result, 0) -> {ok, []};
+extract_result1(_Result, 0) -> [];
 extract_result1(Result, N) when N > 0 ->
-    case get_chunk(Result, 0) of
-        {ok, Chunk} ->
-            Names = column_names(Result),
-            Columns = extract_chunk(Chunk),
-            {ok, lists:zipwith(fun(Column, Name) ->
-                                        Column#{ name => Name }
-                               end,
-                               Columns,
-                               Names)};
-        {error, _}=E ->
-            E
-    end.
+    Chunk = get_chunk(Result, 0),
+    Names = column_names(Result),
+    Columns = extract_chunk(Chunk),
+    lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
 
 %% @doc Do a simple sql query without parameters, and retrieve the first data chunk.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
-            extract_result(Result);
+            {ok, extract_result(Result)};
         {error, _}=E ->
             io:fwrite("Error after query ~p~n", [E]),
             E
@@ -552,15 +563,21 @@ execute(Stmt) ->
 
 %%
 %% Utilities
-%%
+%% 
 
 %% @doc Convert a duckdb hugeint record to erlang integer. 
--spec hugeint_to_integer(hugeint()) -> integer().
+-spec hugeint_to_integer(Hugeint) -> Integer
+    when Hugeint :: hugeint(),
+         Integer :: integer().
 hugeint_to_integer(#hugeint{upper=Upper, lower=Lower}) ->
     (Upper bsl 64) bor Lower.
 
-%% @doc Convert an erlang integer to a duckdb hugeint.
--spec integer_to_hugeint(integer()) -> hugeint().
+%% @doc Convert an erlang integer to a DuckDB hugeint.
+%%
+%% For more information on DuckDB numeric types: See <a href="https://duckdb.org/docs/sql/data_types/numeric" target="_parent" rel="noopener">DuckDB Numeric Data Types</a>.
+-spec integer_to_hugeint(Integer) -> Hugeint
+    when Integer :: integer(),
+         Hugeint :: hugeint().
 integer_to_hugeint(Int) ->
     #hugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.
 
