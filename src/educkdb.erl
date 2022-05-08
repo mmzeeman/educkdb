@@ -164,6 +164,7 @@
                    | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
 
 -type column() :: #{ data := list(data()), type := type_name() }.
+-type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
 
 -type bind_response() :: ok | {error, _}.
 -type append_response() :: ok | {error, _}.
@@ -654,7 +655,7 @@ appender_end_row(_Appender) ->
 %% @doc Extract a query result of the first data chunk.
 -spec extract_result(QueryResult) -> Chunks
     when QueryResult :: result(),
-         Chunks :: list().
+         Chunks :: [ named_column() ]. 
 extract_result(QueryResult) ->
     extract_result1(QueryResult, chunk_count(QueryResult)).
 
@@ -665,17 +666,25 @@ extract_result1(Result, N) when N > 0 ->
     Columns = extract_chunk(Chunk),
     lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
 
-%% @doc Do a simple sql query without parameters, and retrieve the first data chunk.
+%% @doc Do a simple sql query without parameters, and retrieve the result from the
+%%      first data chunk.
+-spec squery(Connection, Sql) -> Result
+    when Connection :: connection(),
+         Sql :: sql(),
+         Result :: {ok, [ named_column() ]} | {error, _}.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
             {ok, extract_result(Result)};
         {error, _}=E ->
-            io:fwrite("Error after query ~p~n", [E]),
             E
     end.
 
-%% @doc Execute a prepared statement, and retrieve the first data chunk. 
+%% @doc Execute a prepared statement, and retrieve the first result from the first
+%%      data chunk.
+-spec execute(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, [ named_column() ]} | {error, _}.
 execute(Stmt) ->
     case educkdb:execute_prepared(Stmt) of
         {ok, Result} ->
