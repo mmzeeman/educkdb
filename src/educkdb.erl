@@ -1,3 +1,11 @@
+%% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% @copyright 2022 Maas-Maarten Zeeman
+%%
+%% @doc Low level erlang API for duckdb databases.
+%% @end
+
+%% Copyright 2022 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
@@ -9,16 +17,10 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%
-%% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022 Maas-Maarten Zeeman
-%%
-%% @doc Low level erlang API for duckdb databases.
 
 -module(educkdb).
 -author("Maas-Maarten Zeeman <mmzeeman@xs4all.nl>").
 
--include("educkdb.hrl").
 
 %% low-level exports
 -export([
@@ -89,6 +91,7 @@
     execute/1
 ]).
 
+
 %% Utilities
 -export([
     uuid_binary_to_uuid_string/1,
@@ -98,7 +101,6 @@
     integer_to_hugeint/1
 ]).
 
-
 %% low-level api
 
 -export([
@@ -106,14 +108,15 @@
     execute_prepared_cmd/1
 ]).
 
--type database() :: reference().
+-include("educkdb.hrl").
+
+-type database() :: reference(). 
 -type connection() :: reference().
 -type prepared_statement() :: reference().
 -type result() :: reference().
 -type appender() :: reference().
 -type data_chunk() :: reference().
 
--type hugeint() :: #hugeint{}.
 
 -type sql() :: iodata(). 
 
@@ -131,13 +134,45 @@
 -type int64() :: -16#7FFFFFFFFFFFFFFF..16#7FFFFFFFFFFFFFFF.
 -type uint64() :: 0..16#FFFFFFFFFFFFFFFF. 
 
+-type hugeint() :: #hugeint{}.
+
+-type second() :: float(). %% In the range 0.0..60.0
+-type time() :: {calendar:hour(), calendar:minute(), second()}.
+-type datetime() :: {calendar:date(), time()}.
+
+-type data() :: boolean()
+              | int8() | int16() | int32() | int64() 
+              | uint8() | uint16() | uint32() | uint64()
+              | float() | hugeint() 
+              | calendar:date() | time() | datetime()
+              | binary()
+              | list(data())
+              | #{binary() => data()}
+              | {map, list(data()), list(data())}.
+
+-type type_name() :: boolean
+                   | tinyint | smallint | integer | bigint 
+                   | utinyint | usmallint | uinteger | ubigint
+                   | float | double | hugeint
+                   | timestamp | date | time
+                   | interval 
+                   | varchar | blob
+                   | decimal
+                   | timestamp_s | timestamp_ms | timestamp_ns
+                   | enum
+                   | list | struct | map
+                   | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
+
+-type column() :: #{ data := list(data()), type := type_name() }.
+-type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
+
 -type bind_response() :: ok | {error, _}.
 -type append_response() :: ok | {error, _}.
 
 -export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0,
               int8/0, int16/0, int32/0, int64/0,
               uint8/0, uint16/0, uint32/0, uint64/0,
-              idx/0
+              idx/0, hugeint/0, second/0, time/0, datetime/0
              ]).
 
 -define(SEC_TO_MICS(S), (S * 1000000)).
@@ -156,19 +191,23 @@ init() ->
                   end,
     ok = erlang:load_nif(NifFileName, 0).
 
-
 %%
 %% Startup & Configure
 %%
 
 %% @doc Open, or create a duckdb database with default options.
-%%
+-spec open(Filename) -> Result
+    when Filename :: string(),
+         Result :: {ok, database()} | {error, _}.
 open(Filename) ->
     open(Filename, #{}).
 
 %% @doc Open, or create a duckdb file
 %%
-% -spec open(, map()) -> {ok, database()} | {error, _}.
+-spec open(Filename, Options) -> Result
+    when Filename :: string(),
+         Options :: map(),
+         Result :: {ok, database()} | {error, _}.
 open(_Filename, _Options) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -176,7 +215,9 @@ open(_Filename, _Options) ->
 %%      is used by long running commands. Note: It is adviced to use the
 %%      connection in a single process.
 %%
--spec connect(database()) -> {ok, connection()} | {error, _}.
+-spec connect(Database) -> Result
+    when Database :: database(),
+         Result :: {ok, connection()} | {error, _}.
 connect(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -184,42 +225,51 @@ connect(_Db) ->
 %% @doc Disconnect from the database. Stops the thread.
 %%      The calling pid will receive:
 %%      {disconnect, Ref, ok | {error, _}}.
--spec disconnect(connection()) -> ok | {error, _}.
+-spec disconnect(Connection) -> Result
+    when Connection :: connection(),
+         Result :: ok | {error, _}.
 disconnect(_Connection) ->
     erlang:nif_error(nif_library_not_loaded).
                                  
 %% @doc Close the database. All open connections will become unusable.
--spec close(database()) -> ok | {error, _}.
+-spec close(Database) -> Result
+    when Database :: database(),
+         Result :: ok | {error, _}.
 close(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
  
 
-%% @doc Return a list with config flags, and explanation
+%% @doc Return a map with config flags, and explanations. The options
+%%      can vary depending on the underlying DuckDB version used.
+%%      For more information about DuckDB configuration options, see: 
+%%      <a href="https://duckdb.org/docs/sql/configuration" target="_parent" rel="noopener">DuckDB Configuration</a>.
 -spec config_flag_info() -> map().
 config_flag_info() ->
     erlang:nif_error(nif_library_not_loaded).
- 
+
 %%
 %% Query
 %%
 
 %% @doc Query the database. The answer the answer is returned immediately. 
-%% Special care has been taken to prevent blocking the scheduler. A reference
-%% to a result data structure will be returned. 
--spec query(connection(), sql()) -> {ok, result()} | {error, _}.
+%%      Special care has been taken to prevent blocking the scheduler. A reference
+%%      to a result data structure will be returned. 
+-spec query(Connection, Sql) -> Result
+    when Connection :: connection(),
+         Sql :: sql(),
+         Result :: {ok, result()} | {error, _}.
 query(Conn, Sql) ->
     case query_cmd(Conn, Sql) of
         {ok, Ref} ->
             receive 
-                {educkdb, Ref, Answer} ->
-                    Answer
+                {educkdb, Ref, Answer} -> Answer
             end;
         {error, _}=E ->
             E
     end.
 
 %% @doc Query the database. The answer is send back as a result to 
-%% the calling process.
+%%      the calling process. 
 -spec query_cmd(connection(), sql()) -> {ok, reference()} | {error, _}.
 query_cmd(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
@@ -233,6 +283,10 @@ query_cmd(_Conn, _Sql) ->
 prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
+
+-spec execute_prepared(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, result()} | {error, _}.
 execute_prepared(PreparedStatement) ->
     case execute_prepared_cmd(PreparedStatement) of
         {ok, Ref} ->
@@ -244,11 +298,18 @@ execute_prepared(PreparedStatement) ->
             E
     end.
 
--spec execute_prepared_cmd(prepared_statement()) -> bind_response().
+-spec execute_prepared_cmd(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, reference()} | {error, _}.
 execute_prepared_cmd(_Stmt) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_boolean(prepared_statement(), idx(), boolean()) -> bind_response().
+%% @doc Bind a boolean to the prepared statement at the specified index.
+-spec bind_boolean(PreparedStatement, Index, Boolean) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(), 
+         Boolean :: boolean(),
+         BindResponse :: bind_response().
 bind_boolean(Statement, Index, true) ->
     bind_boolean_intern(Statement, Index, 1);
 bind_boolean(Statement, Index, false) ->
@@ -258,47 +319,109 @@ bind_boolean(Statement, Index, false) ->
 bind_boolean_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int8(prepared_statement(), idx(), int8()) -> bind_response().
+
+%% @doc Bind an int8 to the prepared statement at the specified index.
+-spec bind_int8(PreparedStatement, Index, Int8) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int8 :: int8(),
+         BindResponse :: bind_response().
 bind_int8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int16(prepared_statement(), idx(), int16()) -> bind_response().
+%% @doc Bind an int16 to the prepared statement at the specified index.
+-spec bind_int16(PreparedStatement, Index, Int16) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int16 :: int16(),
+         BindResponse :: bind_response().
 bind_int16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int32(prepared_statement(), idx(), int32()) -> bind_response().
+%% @doc Bind an int32 to the prepared statement at the specified index.
+-spec bind_int32(PreparedStatement, Index, Int32) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int32 :: int32(),
+         BindResponse :: bind_response().
 bind_int32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_int64(prepared_statement(), idx(), int64()) -> bind_response().
+%% @doc Bind an int64 to the prepared statement at the specified index.
+-spec bind_int64(PreparedStatement, Index, Int64) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Int64 :: int64(),
+         BindResponse :: bind_response().
 bind_int64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint8(prepared_statement(), idx(), uint8()) -> bind_response().
+%% @doc Bind an uint8 to the prepared statement at the specified index.
+-spec bind_uint8(PreparedStatement, Index, UInt8) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt8 :: uint8(),
+         BindResponse :: bind_response().
 bind_uint8(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint16(prepared_statement(), idx(), uint16()) -> bind_response().
+%% @doc Bind an uint8 to the prepared statement at the specified index.
+-spec bind_uint16(PreparedStatement, Index, UInt16) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt16 :: uint16(),
+         BindResponse :: bind_response().
 bind_uint16(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint32(prepared_statement(), idx(), uint32()) -> bind_response().
+%% @doc Bind an uint32 to the prepared statement at the specified index.
+-spec bind_uint32(PreparedStatement, Index, UInt32) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt32 :: uint32(),
+         BindResponse :: bind_response().
 bind_uint32(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_uint64(prepared_statement(), idx(), uint64()) -> bind_response().
+%% @doc Bind an uint64 to the prepared statement at the specified index.
+-spec bind_uint64(PreparedStatement, Index, UInt64) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         UInt64 :: uint64(),
+         BindResponse :: bind_response().
 bind_uint64(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_float(prepared_statement(), idx(), float()) -> bind_response().
+%% @doc Bind an float to the prepared statement at the specified index. Note: Erlang's
+%%      float() datatype is actually a DuckDB double. When binding an Erlang float
+%%      variable you will lose precision.
+-spec bind_float(PreparedStatement, Index, Float) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Float :: float(),
+         BindResponse :: bind_response().
 bind_float(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_double(prepared_statement(), idx(), float()) -> bind_response().
+%% @doc Bind an uint64 to the prepared statement at the specified index. Note: Erlang's
+%%      float datatype is a DuckDB double. Using this function allows you to keep the
+%%      precision.
+-spec bind_double(PreparedStatement, Index, Double) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Double :: float(),
+         BindResponse :: bind_response().
 bind_double(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a date to the prepared statement at the specified index. The date can be 
+%%      either given as a calendar:date() tuple, or an integer with the number of 
+%%      days since the first of January in the year 0.
+-spec bind_date(PreparedStatement, Index, Date) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Date :: calendar:date() | integer(),
+         BindResponse :: bind_response().
 bind_date(Stmt, Index, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
     bind_date_intern(Stmt, Index, calendar:date_to_gregorian_days(Date));
 bind_date(Stmt, Index, Days) when is_integer(Days) ->
@@ -308,7 +431,14 @@ bind_date(Stmt, Index, Days) when is_integer(Days) ->
 bind_date_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a time to the prepared statement at the specified index. The time can be either
+%%      given as an {hour, minute, second} tuple (similar to calendar:time()), or as an integer
+%%      with the number of microseconds since midnight.
+-spec bind_time(PreparedStatement, Index, Time) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         Time :: calendar:time() | time() | non_neg_integer(),
+         BindResponse :: bind_response().
 bind_time(Stmt, Index, {H, M, S}) -> 
     bind_time_intern(Stmt, Index, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
 bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
@@ -317,7 +447,14 @@ bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
 bind_time_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a timestamp to the prepared statement at the specified index. The timestamp
+%%      can be either a datetime tuple, or an integer with the microseconds since 1-Jan in 
+%%      the year 0.
+-spec bind_timestamp(PreparedStatement, Index, TimeStamp) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         TimeStamp :: calendar:datetime() | datetime() | integer(),
+         BindResponse :: bind_response().
 bind_timestamp(Stmt, Index, {MegaSecs, Secs, MicroSecs}) ->
     bind_timestamp_intern(Stmt, Index, ?EPOCH_OFFSET + ?SEC_TO_MICS(MegaSecs * 1000000) + ?SEC_TO_MICS(Secs) + MicroSecs);
 bind_timestamp(Stmt, Index, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
@@ -330,44 +467,67 @@ bind_timestamp(Stmt, Index, Micros) when is_integer(Micros) ->
 bind_timestamp_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-
-% @doc Bind a iolist as varchar. 
-% Note: be really carefull, value must be valid utf8 data.
--spec bind_varchar(prepared_statement(), idx(), iodata()) -> bind_response().
+% @doc Bind a iolist as varchar to the prepared statement at the specified index. Note: This
+%      function is meant to bind null terminated strings in the database. Not arbitrary
+%      binary data.
+-spec bind_varchar(PreparedStatement, Index, IOData) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         IOData :: iodata(),
+         BindResponse :: bind_response().
 bind_varchar(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_null(prepared_statement(), idx()) -> bind_response().
+% @doc Bind a null value to the prepared statement at the specified index.
+-spec bind_null(PreparedStatement, Index) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         BindResponse :: bind_response().
 bind_null(_Stmt, _Index) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%
 %% Results
 %%
-%%
--spec get_chunks(result()) -> [data_chunk()]. 
+
+%% @doc Get all data chunks from a query result.
+-spec get_chunks(QueryResult) -> DataChunks
+    when QueryResult :: result(),
+         DataChunks :: list(data_chunk()).
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
- -spec get_chunk(result(), uint64()) -> {ok, data_chunk()} | {error, _}. 
+%% @doc Get a data chunk from a query result.
+ -spec get_chunk(QueryResult, Idx) -> DataChunk 
+    when QueryResult :: result(),
+         Idx :: non_neg_integer(),
+         DataChunk :: data_chunk().
 get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec chunk_count(result()) -> uint64().
+%% @doc Get the number of data chunks in a query result.
+-spec chunk_count(QueryResult) -> Count
+    when QueryResult :: result(),
+         Count :: uint64().
 chunk_count(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec column_names(result()) -> [binary()].
+%% @doc Get the column names from the query result.
+-spec column_names(QueryResult) -> Names 
+    when QueryResult :: result(),
+         Names :: list(binary()).
 column_names(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
-
 
 %%
 %% Chunks
 %%
 
-
-%-spec chunk_extract(data_chunk()) -> uint64().
+%% @doc Extract the data from a data chunk. Chunks contain multiple columns and
+%%      rows. All data in the chunks is extracted.
+-spec extract_chunk(DataChunk) -> Columns
+    when DataChunk :: data_chunk(),
+         Columns :: list(column()).
 extract_chunk(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -492,36 +652,39 @@ appender_end_row(_Appender) ->
 %% Higher Level API
 %%
 
-%% @doc Extra
-extract_result(Result) ->
-    extract_result1(Result, chunk_count(Result)).
+%% @doc Extract a query result of the first data chunk.
+-spec extract_result(QueryResult) -> Chunks
+    when QueryResult :: result(),
+         Chunks :: [ named_column() ]. 
+extract_result(QueryResult) ->
+    extract_result1(QueryResult, chunk_count(QueryResult)).
 
-extract_result1(_Result, 0) -> {ok, []};
+extract_result1(_Result, 0) -> [];
 extract_result1(Result, N) when N > 0 ->
-    case get_chunk(Result, 0) of
-        {ok, Chunk} ->
-            Names = column_names(Result),
-            Columns = extract_chunk(Chunk),
-            {ok, lists:zipwith(fun(Column, Name) ->
-                                        Column#{ name => Name }
-                               end,
-                               Columns,
-                               Names)};
-        {error, _}=E ->
-            E
-    end.
+    Chunk = get_chunk(Result, 0),
+    Names = column_names(Result),
+    Columns = extract_chunk(Chunk),
+    lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
 
-%% @doc Do a simple sql query without parameters, and retrieve the first data chunk.
+%% @doc Do a simple sql query without parameters, and retrieve the result from the
+%%      first data chunk.
+-spec squery(Connection, Sql) -> Result
+    when Connection :: connection(),
+         Sql :: sql(),
+         Result :: {ok, [ named_column() ]} | {error, _}.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
-            extract_result(Result);
+            {ok, extract_result(Result)};
         {error, _}=E ->
-            io:fwrite("Error after query ~p~n", [E]),
             E
     end.
 
-%% @doc Execute a prepared statement, and retrieve the first data chunk. 
+%% @doc Execute a prepared statement, and retrieve the first result from the first
+%%      data chunk.
+-spec execute(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: {ok, [ named_column() ]} | {error, _}.
 execute(Stmt) ->
     case educkdb:execute_prepared(Stmt) of
         {ok, Result} ->
@@ -531,15 +694,21 @@ execute(Stmt) ->
 
 %%
 %% Utilities
-%%
+%% 
 
 %% @doc Convert a duckdb hugeint record to erlang integer. 
--spec hugeint_to_integer(hugeint()) -> integer().
+-spec hugeint_to_integer(Hugeint) -> Integer
+    when Hugeint :: hugeint(),
+         Integer :: integer().
 hugeint_to_integer(#hugeint{upper=Upper, lower=Lower}) ->
     (Upper bsl 64) bor Lower.
 
-%% @doc Convert an erlang integer to a duckdb hugeint.
--spec integer_to_hugeint(integer()) -> hugeint().
+%% @doc Convert an erlang integer to a DuckDB hugeint.
+%%
+%% For more information on DuckDB numeric types: See <a href="https://duckdb.org/docs/sql/data_types/numeric" target="_parent" rel="noopener">DuckDB Numeric Data Types</a>.
+-spec integer_to_hugeint(Integer) -> Hugeint
+    when Integer :: integer(),
+         Hugeint :: hugeint().
 integer_to_hugeint(Int) ->
     #hugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.
 
