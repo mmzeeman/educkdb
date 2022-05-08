@@ -110,16 +110,13 @@
 
 -include("educkdb.hrl").
 
--type database() :: reference().
+-type database() :: reference(). 
 -type connection() :: reference().
 -type prepared_statement() :: reference().
 -type result() :: reference().
 -type appender() :: reference().
 -type data_chunk() :: reference().
 
--type hugeint() :: #hugeint{}.
-
--type second() :: float(). %% in the range 0.0..60.0
 
 -type sql() :: iodata(). 
 
@@ -137,13 +134,44 @@
 -type int64() :: -16#7FFFFFFFFFFFFFFF..16#7FFFFFFFFFFFFFFF.
 -type uint64() :: 0..16#FFFFFFFFFFFFFFFF. 
 
+-type hugeint() :: #hugeint{}.
+
+-type second() :: float(). %% In the range 0.0..60.0
+-type time() :: {calendar:hour(), calendar:minute(), second()}.
+-type datetime() :: {calendar:date(), time()}.
+
+-type data() :: boolean()
+              | int8() | int16() | int32() | int64() 
+              | uint8() | uint16() | uint32() | uint64()
+              | float() | hugeint() 
+              | calendar:date() | time() | datetime()
+              | binary()
+              | list(data())
+              | #{binary() => data()}
+              | {map, list(data()), list(data())}.
+
+-type type_name() :: boolean
+                   | tinyint | smallint | integer | bigint 
+                   | utinyint | usmallint | uinteger | ubigint
+                   | float | double | hugeint
+                   | timestamp | date | time
+                   | interval 
+                   | varchar | blob
+                   | decimal
+                   | timestamp_s | timestamp_ms | timestamp_ns
+                   | enum
+                   | list | struct | map
+                   | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
+
+-type column() :: #{ data := list(data()), type := type_name() }.
+
 -type bind_response() :: ok | {error, _}.
 -type append_response() :: ok | {error, _}.
 
 -export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0,
               int8/0, int16/0, int32/0, int64/0,
               uint8/0, uint16/0, uint32/0, uint64/0,
-              idx/0
+              idx/0, hugeint/0, second/0, time/0, datetime/0
              ]).
 
 -define(SEC_TO_MICS(S), (S * 1000000)).
@@ -240,7 +268,7 @@ query(Conn, Sql) ->
     end.
 
 %% @doc Query the database. The answer is send back as a result to 
-%% the calling process.
+%%      the calling process. 
 -spec query_cmd(connection(), sql()) -> {ok, reference()} | {error, _}.
 query_cmd(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
@@ -408,7 +436,7 @@ bind_date_intern(_Stmt, _Index, _Value) ->
 -spec bind_time(PreparedStatement, Index, Time) -> BindResponse
     when PreparedStatement :: prepared_statement(),
          Index :: idx(),
-         Time :: calendar:time() | {calendar:hour(), calendar:minute(), second()} | non_neg_integer(),
+         Time :: calendar:time() | time() | non_neg_integer(),
          BindResponse :: bind_response().
 bind_time(Stmt, Index, {H, M, S}) -> 
     bind_time_intern(Stmt, Index, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
@@ -418,7 +446,14 @@ bind_time(Stmt, Index, Micros) when is_integer(Micros) ->
 bind_time_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Bind a timestamp to the prepared statement at the specified index. The timestamp
+%%      can be either a datetime tuple, or an integer with the microseconds since 1-Jan in 
+%%      the year 0.
+-spec bind_timestamp(PreparedStatement, Index, TimeStamp) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         TimeStamp :: calendar:datetime() | datetime() | integer(),
+         BindResponse :: bind_response().
 bind_timestamp(Stmt, Index, {MegaSecs, Secs, MicroSecs}) ->
     bind_timestamp_intern(Stmt, Index, ?EPOCH_OFFSET + ?SEC_TO_MICS(MegaSecs * 1000000) + ?SEC_TO_MICS(Secs) + MicroSecs);
 bind_timestamp(Stmt, Index, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
@@ -431,14 +466,22 @@ bind_timestamp(Stmt, Index, Micros) when is_integer(Micros) ->
 bind_timestamp_intern(_Stmt, _Index, _Value) ->
     erlang:nif_error(nif_library_not_loaded).
 
-
-% @doc Bind a iolist as varchar. 
-% Note: be really carefull, value must be valid utf8 data.
--spec bind_varchar(prepared_statement(), idx(), iodata()) -> bind_response().
+% @doc Bind a iolist as varchar to the prepared statement at the specified index. Note: This
+%      function is meant to bind null terminated strings in the database. Not arbitrary
+%      binary data.
+-spec bind_varchar(PreparedStatement, Index, IOData) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         IOData :: iodata(),
+         BindResponse :: bind_response().
 bind_varchar(_Stmt, _Index, _Value) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec bind_null(prepared_statement(), idx()) -> bind_response().
+% @doc Bind a null value to the prepared statement at the specified index.
+-spec bind_null(PreparedStatement, Index) -> BindResponse
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         BindResponse :: bind_response().
 bind_null(_Stmt, _Index) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -479,8 +522,11 @@ column_names(_Result) ->
 %% Chunks
 %%
 
-
-%-spec chunk_extract(data_chunk()) -> uint64().
+%% @doc Extract the data from a data chunk. Chunks contain multiple columns and
+%%      rows. All data in the chunks is extracted.
+-spec extract_chunk(DataChunk) -> Columns
+    when DataChunk :: data_chunk(),
+         Columns :: list(column()).
 extract_chunk(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
