@@ -531,11 +531,17 @@ column_names(_Result) ->
 extract_chunk(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec get_chunk_column_count(data_chunk()) -> uint64().
+%% @doc Return the number of columns in the data chunk.
+-spec get_chunk_column_count(DataChunk) -> ColumnCount
+    when DataChunk :: data_chunk(),
+         ColumnCount :: uint64().
 get_chunk_column_count(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec get_chunk_size(data_chunk()) -> uint64().
+%% @doc Return the number of tuples in th data chunk.
+-spec get_chunk_size(DataChunk) -> TupleCount
+    when DataChunk :: data_chunk(),
+         TupleCount :: uint64().
 get_chunk_size(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -543,58 +549,110 @@ get_chunk_size(_Chunk) ->
 %% Appender Interface
 %%
 
--spec appender_create(connection(), string(), string()) -> {ok, appender()} | {error, _}. 
+%% @doc Create an appender. Appenders allow for high speed bulk insertions into the database. See
+%%      <a href="https://duckdb.org/docs/data/appender">DuckDB Appender</a> for more information.
+-spec appender_create(Connection, Schema, Table) -> Result 
+    when Connection :: connection(),
+         Schema :: undefined | binary(),
+         Table :: binary,
+         Result :: {ok, appender()} | {error, _}.
 appender_create(_Connection, _Schema, _Table) -> 
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_boolean(appender(), boolean()) -> append_response().
+%% @doc Append a boolean value to the current location in the row.
+-spec append_boolean(Appender, Boolean) -> AppendResponse
+    when Appender :: appender(),
+         Boolean :: boolean(),
+         AppendResponse :: append_response().
 append_boolean(Appender, true) ->
     append_boolean_intern(Appender, 1);
 append_boolean(Appender, false) ->
     append_boolean_intern(Appender, 0).
 
-
 -spec append_boolean_intern(appender(), int32()) -> append_response().
 append_boolean_intern(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int8(appender(), int8()) -> append_response().
+%% @doc Append a tinyint to the current location in the row.
+-spec append_int8(Appender, TinyInt) -> AppendResponse
+    when Appender :: appender(),
+         TinyInt :: int8(),
+         AppendResponse :: append_response().
 append_int8(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int16(appender(), int16()) -> append_response().
+%% @doc Append a smallint to the current location in the row.
+-spec append_int16(Appender, SmallInt) -> AppendResponse
+    when Appender :: appender(),
+         SmallInt :: int16(),
+         AppendResponse :: append_response().
 append_int16(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int32(appender(), int32()) -> append_response().
+%% @doc Append an integer (32 bit) to the current location in the row.
+-spec append_int32(Appender, Integer) -> AppendResponse
+    when Appender :: appender(),
+         Integer :: int32(),
+         AppendResponse :: append_response().
 append_int32(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_int64(appender(), integer()) -> append_response().
+%% @doc Append a bigint to the current location in the row.
+-spec append_int64(Appender, BigInt) -> AppendResponse
+    when Appender :: appender(),
+         BigInt :: int64(),
+         AppendResponse :: append_response().
 append_int64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint8(appender(), uint8()) -> append_response().
+%% @doc Append a utinyint to the current location in the row.
+-spec append_uint8(Appender, UTinyInt) -> AppendResponse
+    when Appender :: appender(),
+         UTinyInt :: uint8(),
+         AppendResponse :: append_response().
 append_uint8(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint16(appender(), uint16()) -> append_response().
+%% @doc Append a usmallint to the current location in the row.
+-spec append_uint16(Appender, USmallInt) -> AppendResponse
+    when Appender :: appender(),
+         USmallInt :: uint16(),
+         AppendResponse :: append_response().
 append_uint16(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint32(appender(), uint32()) -> append_response().
+%% @doc Append an unsigned integer (32 bit) to the current location in the row.
+-spec append_uint32(Appender, UInteger) -> AppendResponse
+    when Appender :: appender(),
+         UInteger :: uint32(),
+         AppendResponse :: append_response().
 append_uint32(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_uint64(appender(), uint64()) -> append_response().
+%% @doc Append a ubigint to the current location in the row.
+-spec append_uint64(Appender, UBigInt) -> AppendResponse
+    when Appender :: appender(),
+         UBigInt :: uint64(),
+         AppendResponse :: append_response().
 append_uint64(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_float(appender(), float()) -> append_response().
+%% @doc Append a float to the current location in the row. Note: duckdb floats
+%%      are different than erlang floats. When you add an erlang float to a 
+%%      duckdb float column, you will loose precision.
+-spec append_float(Appender, Float) -> AppendResponse
+    when Appender :: appender(),
+         Float :: float(),
+         AppendResponse :: append_response().
 append_float(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec append_double(appender(), float()) -> append_response().
+%% @doc Append a doulbe to the current location in the row. Note: duckdb double's 
+%%      are the same as erlang floats. 
+-spec append_double(Appender, Double) -> AppendResponse
+    when Appender :: appender(),
+         Double :: float(),
+         AppendResponse :: append_response().
 append_double(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
