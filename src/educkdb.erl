@@ -120,21 +120,21 @@
 
 -type sql() :: iodata(). 
 
--type idx() :: 0..16#FFFFFFFFFFFFFFFF. 
+-type idx() :: uint64(). % DuckDB index type
 
--type int8() :: -16#7F..16#7F.
--type uint8() :: 0..16#FF.
+-type int8() :: -16#7F..16#7F. % DuckDB tinyint
+-type uint8() :: 0..16#FF. % DuckDB duckdb utinyint
 
--type int16() :: -16#7FFF..16#7FFF.
--type uint16() :: 0..16#FFFF.
+-type int16() :: -16#7FFF..16#7FFF. % DuckDB  shortint
+-type uint16() :: 0..16#FFFF. % DuckDB ushortint
 
--type int32() :: -16#7FFFFFFF..16#7FFFFFFF.
--type uint32() :: 0..16#FFFFFFFF.
+-type int32() :: -16#7FFFFFFF..16#7FFFFFFF. % DuckDB integer
+-type uint32() :: 0..16#FFFFFFFF. % DuckDB uinteger
 
--type int64() :: -16#7FFFFFFFFFFFFFFF..16#7FFFFFFFFFFFFFFF.
--type uint64() :: 0..16#FFFFFFFFFFFFFFFF. 
+-type int64() :: -16#7FFFFFFFFFFFFFFF..16#7FFFFFFFFFFFFFFF. % DuckDB bigint
+-type uint64() :: 0..16#FFFFFFFFFFFFFFFF.  % DuckDB ubigint
 
--type hugeint() :: #hugeint{}.
+-type hugeint() :: #hugeint{}. % struct, making up a 128 bit signed integer.
 
 -type second() :: float(). %% In the range 0.0..60.0
 -type time() :: {calendar:hour(), calendar:minute(), second()}.
