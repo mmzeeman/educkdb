@@ -252,8 +252,9 @@ config_flag_info() ->
 %%
 
 %% @doc Query the database. The answer the answer is returned immediately. 
-%%      Special care has been taken to prevent blocking the scheduler. A reference
-%%      to a result data structure will be returned. 
+%%      Note: The query is processed in a separate thread to make sure it
+%%      does not block an Erlang scheduler. Each connection has its own
+%%      separate query thread.
 -spec query(Connection, Sql) -> Result
     when Connection :: connection(),
          Sql :: sql(),
@@ -268,7 +269,7 @@ query(Conn, Sql) ->
             E
     end.
 
-%% @doc Query the database. The answer is send back as a result to 
+%% @doc Query the database. The answer is sent back as a result to 
 %%      the calling process. 
 -spec query_cmd(connection(), sql()) -> {ok, reference()} | {error, _}.
 query_cmd(_Conn, _Sql) ->
@@ -284,6 +285,10 @@ prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
+%% @doc Execute a prepared statement. The answer is returned. Note: the 
+%%      query is processed in a separate thread to make sure it does not
+%%      block a scheduler. Each connection has its own separate query
+%%      thread.
 -spec execute_prepared(PreparedStatement) -> Result
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, result()} | {error, _}.
@@ -298,6 +303,8 @@ execute_prepared(PreparedStatement) ->
             E
     end.
 
+%% @doc Execute the prepared statement. The answer is sent back as a result to 
+%%      the calling process. 
 -spec execute_prepared_cmd(PreparedStatement) -> Result
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, reference()} | {error, _}.
@@ -647,7 +654,7 @@ append_uint64(_Appender, _Integer) ->
 append_float(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc Append a doulbe to the current location in the row. Note: duckdb double's 
+%% @doc Append a double to the current location in the row. Note: duckdb double's 
 %%      are the same as erlang floats. 
 -spec append_double(Appender, Double) -> AppendResponse
     when Appender :: appender(),
@@ -656,7 +663,11 @@ append_float(_Appender, _Integer) ->
 append_double(_Appender, _Integer) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Append a time to the current location in the row.
+-spec append_time(Appender, Time) -> AppendResponse
+    when Appender :: appender(),
+         Time :: calendar:time() | time() | non_neg_integer(),
+         AppendResponse :: append_response().
 append_time(Appender, {H, M, S}) -> 
     append_time_intern(Appender, ?HOUR_TO_MICS(H) + ?MIN_TO_MICS(M) + floor(?SEC_TO_MICS(S)));
 append_time(Appender, Micros) when is_integer(Micros) ->
@@ -665,7 +676,11 @@ append_time(Appender, Micros) when is_integer(Micros) ->
 append_time_intern(_Appender, _Time) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc 
+%% @doc Append a data to the current location in the row.
+-spec append_date(Appender, Date) -> AppendResponse
+    when Appender :: appender(),
+         Date :: calendar:date() | integer(),
+         AppendResponse :: append_response().
 append_date(Appender, {Y, M, D}=Date) when is_integer(Y) andalso is_integer(M) andalso is_integer(D) ->
     append_date_intern(Appender, calendar:date_to_gregorian_days(Date));
 append_date(Appender, Days) when is_integer(Days) ->
@@ -675,7 +690,11 @@ append_date_intern(_Appender, _Date) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
-%% @doc 
+%% @doc Append a timestamp to the current location in the row.
+-spec append_timestamp(Appender, Timestamp) -> AppendResponse
+    when Appender :: appender(),
+         Timestamp :: calendar:datetime() | erlang:timestamp() | datetime() | integer(),
+         AppendResponse :: append_response().
 append_timestamp(Appender, {MegaSecs, Secs, MicroSecs}) ->
     append_timestamp_intern(Appender, ?EPOCH_OFFSET + ?SEC_TO_MICS(MegaSecs * 1000000) + ?SEC_TO_MICS(Secs) + MicroSecs);
 append_timestamp(Appender, {{_, _, _}=Date, {Hour, Minute, Second}}) -> 
@@ -688,23 +707,36 @@ append_timestamp(Appender, Micros) when is_integer(Micros) ->
 append_timestamp_intern(_Appender, _Timestamp) ->
     erlang:nif_error(nif_library_not_loaded).
 
-
--spec append_varchar(appender(), iodata()) -> append_response().
+%% @doc Append a varchar to the current location in the row.
+-spec append_varchar(Appender, IOData) -> AppendResponse
+    when Appender :: appender(),
+         IOData :: iodata(),
+         AppendResponse :: append_response().
 append_varchar(_Appender, _IOData) ->
     erlang:nif_error(nif_library_not_loaded).
 
-
--spec append_null(appender()) -> append_response().
+%% @doc Append a null value to the current location in the row.
+-spec append_null(Appender) -> AppendResponse
+    when Appender :: appender(),
+         AppendResponse :: append_response().
 append_null(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec appender_flush(appender()) -> append_response().
+%% @doc Finalize the current row, and start a new one.
+-spec appender_end_row(Appender) -> AppendResponse
+    when Appender :: appender(),
+         AppendResponse :: append_response().
+appender_end_row(_Appender) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Flush the appender to the table, forcing the cache of the appender to be cleared
+%%      and the data to be appended to the base table.
+-spec appender_flush(Appender) -> AppendResult
+    when Appender :: appender(),
+         AppendResult :: append_response().
 appender_flush(_Appender) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec appender_end_row(appender()) -> append_response().
-appender_end_row(_Appender) ->
-    erlang:nif_error(nif_library_not_loaded).
 
 %%
 %% Higher Level API
