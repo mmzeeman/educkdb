@@ -1,7 +1,7 @@
 {application, educkdb,
  [
   {description, "DuckDB NIF Interface"},
-  {vsn, "0.3.8"},
+  {vsn, "0.3.9"},
   {modules, [educkdb]},
   {registered, []},
   {licenses, ["Apache"]},
