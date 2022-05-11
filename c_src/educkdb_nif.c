@@ -47,9 +47,10 @@ typedef struct {
     duckdb_database database;
 } educkdb_database;
 
-/* Database connection context and thread */
+/* Database connection */
 typedef struct {
     duckdb_connection connection;
+    ERL_NIF_TERM owner_pid;
 } educkdb_connection;
 
 typedef struct {
@@ -419,6 +420,10 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         enif_release_resource(conn);
         return make_error_tuple(env, "duckdb_connect");
     }
+
+    ErlNifPid current_pid;
+    enif_self(env, &current_pid);
+    conn->owner_pid = enif_make_pid(env, &current_pid);
     
     db_conn = enif_make_resource(env, conn);
     enif_release_resource(conn);
@@ -444,6 +449,13 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
         return enif_make_badarg(env);
     }
+
+    /* Check owner */
+    ErlNifPid current_pid;
+    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
+        return make_error_tuple(env, make_atom(env, "not_owner"));
+    }
+
 
     /* Simply call destruct, so the thread stops and disconnect.
      * Note: this will immediately remove all commands from the queue.
@@ -479,6 +491,12 @@ educkdb_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
         return enif_make_badarg(env);
+    } 
+    
+    /* Check owner */
+    ErlNifPid current_pid;
+    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
+        return make_error_tuple(env, make_atom(env, "not_owner"));
     }
 
     educkdb_result *result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
@@ -1378,9 +1396,15 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
         return enif_make_badarg(env);
     }
-
+    
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
         return enif_make_badarg(env);
+    }
+
+    /* Check owner */
+    ErlNifPid current_pid;
+    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
+        return make_error_tuple(env, make_atom(env, "not_owner"));
     }
 
     prepared_statement = enif_alloc_resource(educkdb_prepared_statement_type, sizeof(educkdb_prepared_statement));
@@ -2550,9 +2574,9 @@ static ErlNifFunc nif_funcs[] = {
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Queries
-    {"query", 2, educkdb_query, ERL_NIF_DIRTY_JOB_IO_BOUND},  // or should it be cpu bound?
     {"prepare", 2, educkdb_prepare},
-    {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND}, // or should it be cpu bound?
+    {"query", 2, educkdb_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Result
     {"chunk_count", 1, educkdb_chunk_count},
