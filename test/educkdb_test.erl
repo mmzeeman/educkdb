@@ -97,7 +97,7 @@ query_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {error, no_iodata} = educkdb:query(Conn, 1000),
+    ?assertError(badarg, educkdb:query(Conn, 1000)),
     {error, {result, "Parser Error: Table must have at least one column!"}} = educkdb:query(Conn, <<"create table test()"/utf8>>),
 
     {ok, Res1} = educkdb:query(Conn, "create table test(id integer, x varchar(20));"),
