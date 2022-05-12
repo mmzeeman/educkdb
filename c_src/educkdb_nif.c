@@ -26,7 +26,6 @@
 #include <stdio.h>
 
 #include <duckdb.h>
-#include "queue.h"
 
 #define MAX_ATOM_LENGTH 255         /* from atom.h, not exposed in erlang include */
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
@@ -48,11 +47,8 @@ typedef struct {
     duckdb_database database;
 } educkdb_database;
 
-/* Database connection context and thread */
+/* Database connection */
 typedef struct {
-    ErlNifTid tid;
-    ErlNifThreadOpts *opts;
-    queue *commands;
     duckdb_connection connection;
 } educkdb_connection;
 
@@ -93,26 +89,6 @@ typedef struct {
     uint64_t length;
 } duckdb_list_entry_t;
 
-typedef enum {
-    cmd_unknown,
-
-    cmd_query,
-    cmd_execute_prepared,
-
-    cmd_stop
-} command_type;
-
-typedef struct {
-    command_type type;
-
-    ErlNifEnv *env;
-    educkdb_prepared_statement *stmt;
-    ErlNifPid pid;
-    
-    ERL_NIF_TERM ref;
-    ERL_NIF_TERM arg;
-} educkdb_command;
-
 static ERL_NIF_TERM atom_educkdb;
 static ERL_NIF_TERM atom_ok;
 static ERL_NIF_TERM atom_error;
@@ -123,7 +99,6 @@ static ERL_NIF_TERM atom_type;
 static ERL_NIF_TERM atom_data;
 static ERL_NIF_TERM atom_hugeint;
 
-static ERL_NIF_TERM push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd);
 
 static ERL_NIF_TERM
 make_atom(ErlNifEnv *env, const char *atom_name)
@@ -166,46 +141,6 @@ make_binary(ErlNifEnv *env, const void *bytes, unsigned int size)
     return term;
 }
 
-static void
-command_destroy(void *obj)
-{
-    educkdb_command *cmd = (educkdb_command *) obj;
-
-    if(cmd->env != NULL) {
-        enif_free_env(cmd->env);
-        cmd->env = NULL;
-    }
-
-    if(cmd->stmt != NULL) {
-        enif_release_resource(cmd->stmt);
-        cmd->stmt = NULL;
-    }
-
-    enif_free(cmd);
-}
-
-static educkdb_command *
-command_create(command_type type)
-{
-    educkdb_command *cmd = (educkdb_command *) enif_alloc(sizeof(educkdb_command));
-    if(cmd == NULL)
-        return NULL;
-
-    cmd->type = type;
-    cmd->env = enif_alloc_env();
-    if(cmd->env == NULL) {
-        command_destroy(cmd);
-        return NULL;
-    }
-
-    cmd->ref = enif_make_ref(cmd->env);
-
-    cmd->arg = 0;
-    cmd->stmt = NULL;
-
-    return cmd;
-}
-
 /*
  *
  */
@@ -222,36 +157,6 @@ destruct_educkdb_database(ErlNifEnv *env, void *arg)
 static void
 destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
     educkdb_connection *conn = (educkdb_connection *) arg;
-    educkdb_command *cmd;
-
-    if(conn->tid) { 
-        cmd = command_create(cmd_stop);
-        if(cmd) {
-            /* Send the stop command to the command thread.
-            */
-            queue_push(conn->commands, cmd);
-
-            /* Wait for the thread to finish
-            */
-            enif_thread_join(conn->tid, NULL);
-        }
-
-        enif_thread_opts_destroy(conn->opts);
-
-        conn->tid = NULL;
-    }
-
-    if(conn->commands) {
-        /* The thread has finished... now remove the command queue, and close
-         * the database (if it was still open).
-         */
-        while(queue_has_item(conn->commands)) {
-            command_destroy(queue_pop(conn->commands));
-        }
-        queue_destroy(conn->commands);
-        conn->commands = NULL;
-    }
-
     duckdb_disconnect(&(conn->connection));
 }
 
@@ -354,115 +259,6 @@ handle_query_error(ErlNifEnv *env, educkdb_result *result) {
                 make_atom(env, "result"), erl_error_msg));
 } 
 
-
-static ERL_NIF_TERM
-do_query(ErlNifEnv *env, educkdb_connection *conn, const ERL_NIF_TERM arg) {
-    ErlNifBinary bin;
-    educkdb_result *result;
-    ERL_NIF_TERM eos = enif_make_int(env, 0);
-    ERL_NIF_TERM eresult;
-
-    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, arg, eos), &bin)) {
-        return make_error_tuple(env, "no_iodata");
-    }
-
-    result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
-    if(!result) {
-        return make_error_tuple(env, "no_memory");
-    }
-
-    /* Run the query, this is handled in a separate thread started by the nif to
-     * prevent it from hijacking the vm's scheduler for too long.
-     * The result datastructure is passed back
-     */
-    if(duckdb_query(conn->connection, (char *) bin.data, &(result->result)) == DuckDBError) {
-        return handle_query_error(env, result);
-    }
-
-    eresult = enif_make_resource(env, result);
-    enif_release_resource(result);
-
-    return make_ok_tuple(env, eresult);
-}
-
-static ERL_NIF_TERM
-do_execute_prepared(ErlNifEnv *env, educkdb_prepared_statement *stmt, const ERL_NIF_TERM arg) {
-    educkdb_result *result;
-    ERL_NIF_TERM eresult;
-
-    result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
-    if(!result) {
-        return make_error_tuple(env, "no_memory");
-    }
-
-    if(duckdb_execute_prepared(stmt->statement, &(result->result)) == DuckDBError) {
-        return handle_query_error(env, result);
-    }
-
-    eresult = enif_make_resource(env, result);
-    enif_release_resource(result);
-
-    return make_ok_tuple(env, eresult);
-}
-
-static ERL_NIF_TERM
-evaluate_command(educkdb_command *cmd, educkdb_connection *conn) {
-    switch(cmd->type) {
-        case cmd_query:
-            return do_query(cmd->env, conn, cmd->arg);
-        case cmd_execute_prepared:
-            return do_execute_prepared(cmd->env, cmd->stmt, cmd->arg);
-        case cmd_unknown:      // not handled
-        case cmd_stop:         // not handled here
-            break;
-    }
-
-    return make_error_tuple(cmd->env, "invalid_command");
-}
-
-
-static ERL_NIF_TERM
-push_command(ErlNifEnv *env, educkdb_connection *conn, educkdb_command *cmd) {
-    ERL_NIF_TERM ref;
-
-    if(&(cmd->pid) == NULL) {
-        return make_error_tuple(env, "no_pid");
-    }
-
-    if(!queue_push(conn->commands, cmd)) {
-        return make_error_tuple(env, "command_push");
-    }
-
-    ref = enif_make_copy(env, cmd->ref);
-    return make_ok_tuple(env, ref);
-}
-
-static void *
-educkdb_connection_run(void *arg)
-{
-    educkdb_connection *conn = (educkdb_connection *) arg;
-    educkdb_command *cmd;
-    int continue_running = 1;
-    ErlNifEnv *env = enif_alloc_env();
-
-    while(continue_running) {
-        cmd = queue_pop(conn->commands);
-
-        if(cmd->type == cmd_stop) {
-            continue_running = 0;
-        } else {
-            ERL_NIF_TERM response = evaluate_command(cmd, conn);
-            ERL_NIF_TERM answer = enif_make_tuple3(cmd->env, atom_educkdb, cmd->ref, response);
-            enif_send(env, &(cmd->pid), cmd->env, answer); 
-        }
-
-        command_destroy(cmd);
-    }
-
-    enif_free_env(env);
-    return NULL;
-}
-
 /*
  * Open the database. 
  *
@@ -516,7 +312,7 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
     database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database));
     if(!database) {
-        return make_error_tuple(env, "no_memory");
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
     rc = duckdb_open_ext(filename, &(database->database), config, &open_error);
@@ -589,7 +385,7 @@ educkdb_config_flag_info(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 /*
- * connect_cmd
+ * connect
  *
  * Creates the communication thread for operations which potentially can't finish
  * within 1ms. 
@@ -600,7 +396,6 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
     educkdb_database *db;
     educkdb_connection *conn;
-    duckdb_state rc;
     ERL_NIF_TERM db_conn;
 
     if(argc != 1) {
@@ -614,43 +409,15 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     /* Initialize the connection resource */
     conn = enif_alloc_resource(educkdb_connection_type, sizeof(educkdb_connection));
     if(!conn) {
-        return make_error_tuple(env, "no_memory");
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
     /* Connect to the database. Internally this can mean the new connections
      * has to wait on a lock from the database connection manager. So this 
      * call must be dirty */
-    rc = duckdb_connect(db->database, &(conn->connection));
-    if(rc == DuckDBError) {
+    if(duckdb_connect(db->database, &(conn->connection)) == DuckDBError) {
         enif_release_resource(conn);
         return make_error_tuple(env, "duckdb_connect");
-    }
-    
-    /* Create command queue */
-    conn->commands = queue_create();
-    if(!conn->commands) {
-        duckdb_close(&(conn->connection));
-        enif_release_resource(conn);
-        return make_error_tuple(env, "command_queue");
-    }
-
-    /* Start command processing thread */
-    conn->opts = enif_thread_opts_create("thread_opts");
-    if(conn->opts == NULL) {
-        duckdb_close(&(conn->connection));
-        queue_destroy(conn->commands);
-        enif_release_resource(conn);
-        return make_error_tuple(env, "thread_opts");
-    }
-
-    conn->opts->suggested_stack_size = 8192; 
-
-    if(enif_thread_create("educkdb_connection", &conn->tid, educkdb_connection_run, conn, conn->opts) != 0) {
-        duckdb_close(&(conn->connection));
-        queue_destroy(conn->commands);
-        enif_thread_opts_destroy(conn->opts);
-        enif_release_resource(conn);
-        return make_error_tuple(env, "thread_create");
     }
 
     db_conn = enif_make_resource(env, conn);
@@ -691,15 +458,16 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
  */
 
 /*
- * query_cmd
+ * query
  *
  * Check the input values, and put the command on the queue to make
  * sure queries are handled in one calling thread.
  */
 static ERL_NIF_TERM
-educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+educkdb_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_connection *conn;
-    educkdb_command *cmd = NULL;
+    ErlNifBinary bin;
+    ERL_NIF_TERM eos = enif_make_int(env, 0);
 
     if(argc != 2) {
         return enif_make_badarg(env);
@@ -709,15 +477,26 @@ educkdb_query_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    cmd = command_create(cmd_query);
-    if(!cmd) {
-        return make_error_tuple(env, "command_create");
+    if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
+        return enif_make_badarg(env);
+    } 
+    
+    educkdb_result *result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
+    if(!result) {
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
-    cmd->arg = enif_make_copy(cmd->env, argv[1]);
-    enif_self(env, &(cmd->pid));
+    /* Run the query, this function is handled by a dirty scheduler. The result datastructure
+     * is passed back.
+     */
+    if(duckdb_query(conn->connection, (char *) bin.data, &(result->result)) == DuckDBError) {
+        return handle_query_error(env, result);
+    }
 
-    return push_command(env, conn, cmd);
+    ERL_NIF_TERM eresult = enif_make_resource(env, result);
+    enif_release_resource(result);
+
+    return make_ok_tuple(env, eresult);
 }
 
 static ERL_NIF_TERM
@@ -1599,14 +1378,14 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
         return enif_make_badarg(env);
     }
-
+    
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
         return enif_make_badarg(env);
     }
 
     prepared_statement = enif_alloc_resource(educkdb_prepared_statement_type, sizeof(educkdb_prepared_statement));
     if(!prepared_statement) {
-        return make_error_tuple(env, "no_memory");
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
     prepared_statement->connection = NULL;
 
@@ -1632,7 +1411,7 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 /*
- * execute_prepared_cmd
+ * execute_prepared
  *
  * Check the input values, and put the command on the queue to make
  * sure queries are handled in one calling thread. Queries can also
@@ -1641,9 +1420,8 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
  * via the queue, and run the query.
  */
 static ERL_NIF_TERM
-educkdb_execute_prepared_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+educkdb_execute_prepared(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
-    educkdb_command *cmd = NULL;
  
     if(argc != 1) {
         return enif_make_badarg(env);
@@ -1653,17 +1431,19 @@ educkdb_execute_prepared_cmd(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
         return enif_make_badarg(env);
     }
 
-    cmd = command_create(cmd_execute_prepared);
-    if(!cmd) {
-        return make_error_tuple(env, "command_create");
+    educkdb_result *result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
+    if(!result) {
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
-    /* Make sure the reference to the statement is kept */
-    cmd->stmt = stmt;
-    enif_keep_resource(stmt);
-    enif_self(env, &(cmd->pid));
+    if(duckdb_execute_prepared(stmt->statement, &(result->result)) == DuckDBError) {
+        return handle_query_error(env, result);
+    }
 
-    return push_command(env, stmt->connection, cmd);
+    ERL_NIF_TERM eresult = enif_make_resource(env, result);
+    enif_release_resource(result);
+
+    return make_ok_tuple(env, eresult);
 }
 
 static ERL_NIF_TERM
@@ -2219,7 +1999,7 @@ educkdb_appender_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     appender = enif_alloc_resource(educkdb_appender_type, sizeof(educkdb_appender));
     if(!appender) {
-        return make_error_tuple(env, "no_memory");
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
     appender->connection = NULL;
 
@@ -2770,9 +2550,9 @@ static ErlNifFunc nif_funcs[] = {
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Queries
-    {"query_cmd", 2, educkdb_query_cmd},
     {"prepare", 2, educkdb_prepare},
-    {"execute_prepared_cmd", 1, educkdb_execute_prepared_cmd},
+    {"query", 2, educkdb_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Result
     {"chunk_count", 1, educkdb_chunk_count},

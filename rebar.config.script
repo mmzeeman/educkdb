@@ -1,5 +1,5 @@
 
-NifSharedSources = ["c_src/educkdb_nif.c", "c_src/queue.c"].
+NifSharedSources = ["c_src/educkdb_nif.c"].
 NifStaticSources = NifSharedSources ++ ["c_src/duckdb/duckdb.cpp"].
 CFlagsDefault = "$CFLAGS -Os".
 CXXFlagsDefault = "$CXXFLAGS -Os -std=c++11".

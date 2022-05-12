@@ -101,13 +101,6 @@
     integer_to_hugeint/1
 ]).
 
-%% low-level api
-
--export([
-    query_cmd/2,
-    execute_prepared_cmd/1
-]).
-
 -include("educkdb.hrl").
 
 -type database() :: reference(). 
@@ -252,27 +245,11 @@ config_flag_info() ->
 %%
 
 %% @doc Query the database. The answer the answer is returned immediately. 
-%%      Note: The query is processed in a separate thread to make sure it
-%%      does not block an Erlang scheduler. Each connection has its own
-%%      separate query thread.
 -spec query(Connection, Sql) -> Result
     when Connection :: connection(),
          Sql :: sql(),
          Result :: {ok, result()} | {error, _}.
-query(Conn, Sql) ->
-    case query_cmd(Conn, Sql) of
-        {ok, Ref} ->
-            receive 
-                {educkdb, Ref, Answer} -> Answer
-            end;
-        {error, _}=E ->
-            E
-    end.
-
-%% @doc Query the database. The answer is sent back as a result to 
-%%      the calling process. 
--spec query_cmd(connection(), sql()) -> {ok, reference()} | {error, _}.
-query_cmd(_Conn, _Sql) ->
+query(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %%
@@ -285,30 +262,11 @@ prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
-%% @doc Execute a prepared statement. The answer is returned. Note: the 
-%%      query is processed in a separate thread to make sure it does not
-%%      block a scheduler. Each connection has its own separate query
-%%      thread.
+%% @doc Execute a prepared statement. The answer is returned.
 -spec execute_prepared(PreparedStatement) -> Result
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, result()} | {error, _}.
-execute_prepared(PreparedStatement) ->
-    case execute_prepared_cmd(PreparedStatement) of
-        {ok, Ref} ->
-            receive 
-                {educkdb, Ref, Answer} ->
-                    Answer
-            end;
-        {error, _}=E ->
-            E
-    end.
-
-%% @doc Execute the prepared statement. The answer is sent back as a result to 
-%%      the calling process. 
--spec execute_prepared_cmd(PreparedStatement) -> Result
-    when PreparedStatement :: prepared_statement(),
-         Result :: {ok, reference()} | {error, _}.
-execute_prepared_cmd(_Stmt) ->
+execute_prepared(_PreparedStatement) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Bind a boolean to the prepared statement at the specified index.

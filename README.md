@@ -66,7 +66,7 @@ will disconnection automatically.
 
 #### `query(Conn, Query)` -> `{ok, QueryResult}` | `{error, msg}`
 
-Note: **via command thread**
+Note: **dirty scheduler**
 
 Run a query, return the result.
 
@@ -74,7 +74,7 @@ Run a query, return the result.
 
 #### `prepare(Conn, Query)` -> `{ok, Stmt}` | `{error, _}`
 
-Note: **via command thread**
+Note: **dirty scheduler**
 
 #### `bind(Stmt, Values)` -> `ok` | `{error, _}`
 
@@ -132,7 +132,7 @@ Note: **direct c**
 
 #### `execute_statement(Stmt)` -> `{ok, result()}` | `{error, _}`
 
-Note: **via command thread**
+Note: **dirty thread**
 
 ### `appender`
 
