@@ -50,7 +50,6 @@ typedef struct {
 /* Database connection */
 typedef struct {
     duckdb_connection connection;
-    ERL_NIF_TERM owner_pid;
 } educkdb_connection;
 
 typedef struct {
@@ -421,10 +420,6 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return make_error_tuple(env, "duckdb_connect");
     }
 
-    ErlNifPid current_pid;
-    enif_self(env, &current_pid);
-    conn->owner_pid = enif_make_pid(env, &current_pid);
-    
     db_conn = enif_make_resource(env, conn);
     enif_release_resource(conn);
 
@@ -449,13 +444,6 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_get_resource(env, argv[0], educkdb_connection_type, (void **) &conn)) {
         return enif_make_badarg(env);
     }
-
-    /* Check owner */
-    ErlNifPid current_pid;
-    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
-        return make_error_tuple(env, make_atom(env, "not_owner"));
-    }
-
 
     /* Simply call destruct, so the thread stops and disconnect.
      * Note: this will immediately remove all commands from the queue.
@@ -493,12 +481,6 @@ educkdb_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     } 
     
-    /* Check owner */
-    ErlNifPid current_pid;
-    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
-        return make_error_tuple(env, make_atom(env, "not_owner"));
-    }
-
     educkdb_result *result = enif_alloc_resource(educkdb_result_type, sizeof(educkdb_result));
     if(!result) {
         return enif_raise_exception(env, make_atom(env, "no_memory"));
@@ -1399,12 +1381,6 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     
     if(!enif_inspect_iolist_as_binary(env, enif_make_list2(env, argv[1], eos), &bin)) {
         return enif_make_badarg(env);
-    }
-
-    /* Check owner */
-    ErlNifPid current_pid;
-    if(enif_self(env, &current_pid) && !enif_is_identical(conn->owner_pid, enif_make_pid(env, &current_pid))) {
-        return make_error_tuple(env, make_atom(env, "not_owner"));
     }
 
     prepared_statement = enif_alloc_resource(educkdb_prepared_statement_type, sizeof(educkdb_prepared_statement));

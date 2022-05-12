@@ -245,9 +245,6 @@ config_flag_info() ->
 %%
 
 %% @doc Query the database. The answer the answer is returned immediately. 
-%%      Note: The query is processed in a separate thread to make sure it
-%%      does not block an Erlang scheduler. Each connection has its own
-%%      separate query thread.
 -spec query(Connection, Sql) -> Result
     when Connection :: connection(),
          Sql :: sql(),
@@ -265,10 +262,7 @@ prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
-%% @doc Execute a prepared statement. The answer is returned. Note: the 
-%%      query is processed in a separate thread to make sure it does not
-%%      block a scheduler. Each connection has its own separate query
-%%      thread.
+%% @doc Execute a prepared statement. The answer is returned.
 -spec execute_prepared(PreparedStatement) -> Result
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, result()} | {error, _}.
