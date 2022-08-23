@@ -45,10 +45,10 @@ educk_db_version_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    ?assertEqual({ok, [ #{ name => <<"library_version">>, type => varchar,
-                           data => [<<"v0.3.4">>] },
-                        #{ name => <<"source_id">>, type => varchar,
-                           data => [<<"662041e2b">>]} ]},
+    ?assertEqual({ok,[#{data => [<<"v0.4.0">>],
+                            name => <<"library_version">>,type => varchar},
+                          #{data => [<<"da9ee490d">>],
+                            name => <<"source_id">>,type => varchar}]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -1212,8 +1212,8 @@ map_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    ?assertMatch({ok, [#{ data := [ #map{ keys = [1, 5, 1, 12], values = [<<"a">>, <<"e">>, <<"b">>, <<"c">>]} ] } ]},
-                 educkdb:squery(Conn, "SELECT map([1, 5, 1, 12], ['a', 'e', 'b', 'c']);")),
+    ?assertMatch({ok, [#{ data := [ #map{ keys = [1, 5, 2, 12], values = [<<"a">>, <<"e">>, <<"b">>, <<"c">>]} ] } ]},
+                 educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
 
 
     ok.
