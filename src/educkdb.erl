@@ -1,10 +1,10 @@
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022 Maas-Maarten Zeeman
+%% @copyright 2022-2023 Maas-Maarten Zeeman
 %%
 %% @doc Low level erlang API for duckdb databases.
 %% @end
 
-%% Copyright 2022 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% Copyright 2022-2023 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.

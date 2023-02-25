@@ -11,7 +11,7 @@
 %% limitations under the License.
 %%
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022 Maas-Maarten Zeeman
+%% @copyright 2022-2023 Maas-Maarten Zeeman
 %%
 %% @doc Test suite for educkdb
 %%
@@ -45,9 +45,9 @@ educk_db_version_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    ?assertEqual({ok,[#{data => [<<"v0.4.0">>],
+    ?assertEqual({ok,[#{data => [<<"v0.6.1">>],
                             name => <<"library_version">>,type => varchar},
-                          #{data => [<<"da9ee490d">>],
+                          #{data => [<<"919cad22e8">>],
                             name => <<"source_id">>,type => varchar}]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
@@ -106,7 +106,8 @@ query_test() ->
     {ok, _Res4} = educkdb:query(Conn, "insert into test values(null, 'null');"),
     {ok, Res5} = educkdb:query(Conn, "select * from test order by id;"),
 
-    ?assertEqual([], educkdb:extract_result(Res1)),
+    ?assertEqual([#{ name => <<"Count">>, type => bigint, data => []}],
+                 educkdb:extract_result(Res1)),
     ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
                  educkdb:extract_result(Res2)),
     ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
@@ -139,7 +140,7 @@ chunk_count_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
-    0 = educkdb:chunk_count(Res),
+    1 = educkdb:chunk_count(Res),
 
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     1 = educkdb:chunk_count(Res1),
@@ -154,7 +155,7 @@ chunk_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
-    0 = educkdb:chunk_count(Res),
+    1 = educkdb:chunk_count(Res),
 
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     [Chunk1] = educkdb:get_chunks(Res1),
@@ -180,7 +181,7 @@ prepare_error_test() ->
 prepare_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+    {ok, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
     Query = "select * from test;",
     {ok, P} = educkdb:prepare(Conn, Query),
 
@@ -195,7 +196,7 @@ bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
     {ok, []} = educkdb:squery(Conn, "select * from test;"),
 
@@ -246,7 +247,7 @@ bind_unsigned_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
     ok = educkdb:bind_uint8(Insert,  1, 0),
@@ -282,7 +283,7 @@ bind_float_and_double_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_float(Insert, 1, 0.0),
@@ -307,7 +308,7 @@ bind_date_and_time_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a date, b time);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a date, b time);"),
 
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
@@ -340,7 +341,7 @@ extract_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
 
     {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('0-01-01');"),
     {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('1970-01-01');"),
@@ -361,7 +362,7 @@ extract_timestamp_test() ->
 bind_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
 
     %%
     %% Test bind
@@ -397,7 +398,7 @@ bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_null(Insert,  1),
@@ -414,7 +415,7 @@ bind_boolean_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a boolean, b boolean);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a boolean, b boolean);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_boolean(Insert, 1, true),
@@ -431,7 +432,7 @@ bind_varchar_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a varchar(10), b varchar(200));"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a varchar(10), b varchar(200));"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_varchar(Insert, 1, "hello"),
@@ -459,7 +460,7 @@ appender_create_test() ->
     {error, {appender, "Catalog Error: Table \"main.test\" could not be found"}} = educkdb:appender_create(Conn, undefined, <<"test">>),
     {error, {appender, "Catalog Error: Table \"x.test\" could not be found"}} = educkdb:appender_create(Conn, <<"x">>, <<"test">>),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a varchar(10), b integer);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a varchar(10), b integer);"),
 
     {ok, _Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -468,7 +469,7 @@ appender_create_test() ->
 appender_end_row_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a varchar(10), b integer);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a varchar(10), b integer);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -480,7 +481,7 @@ appender_end_row_test() ->
 appender_append_int64_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a bigint, b bigint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a bigint, b bigint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -507,7 +508,7 @@ appender_append_int64_test() ->
 appender_append_int32_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a integer, b integer);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a integer, b integer);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -534,7 +535,7 @@ appender_append_int32_test() ->
 appender_append_int16_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a smallint, b smallint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a smallint, b smallint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -561,7 +562,7 @@ appender_append_int16_test() ->
 appender_append_int8_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a tinyint, b tinyint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a tinyint, b tinyint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -588,7 +589,7 @@ appender_append_int8_test() ->
 appender_append_uint64_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a ubigint, b ubigint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a ubigint, b ubigint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -615,7 +616,7 @@ appender_append_uint64_test() ->
 appender_append_uint32_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a uinteger, b uinteger);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a uinteger, b uinteger);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -642,7 +643,7 @@ appender_append_uint32_test() ->
 appender_append_uint16_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a usmallint, b usmallint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a usmallint, b usmallint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -670,7 +671,7 @@ appender_append_uint16_test() ->
 appender_append_uint8_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a utinyint, b utinyint);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a utinyint, b utinyint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -698,7 +699,7 @@ appender_append_uint8_test() ->
 appender_append_boolean_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a boolean, b boolean);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a boolean, b boolean);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -725,7 +726,7 @@ appender_append_boolean_test() ->
 appender_append_time_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a time);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a time);"),
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
     ok = educkdb:append_time(Appender, 0),
@@ -751,7 +752,7 @@ appender_append_time_test() ->
 appender_append_date_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a date);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a date);"),
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
     ok = educkdb:append_date(Appender, 0),
@@ -776,7 +777,7 @@ appender_append_date_test() ->
 appender_append_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
     ok = educkdb:append_timestamp(Appender, 0),
@@ -811,12 +812,14 @@ yielding_test() ->
     
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, []} = educkdb:squery(Conn, "create table test(a integer, b varchar, c varchar);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a integer, b varchar, c varchar);"),
 
     %% Insert a lot of records to ensure yielding takes place records 
     Values = lists:seq(1, 100000),
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
-    {ok, []} = educkdb:squery(Conn, "begin;"),
+
+    {ok, [ #{ data := [], name := <<"Success">>, type := boolean} ]} = educkdb:squery(Conn, "begin;"),
+
     lists:foreach(fun(V) ->
                           ok = educkdb:append_int32(Appender, V),
                           ok = educkdb:append_varchar(Appender, "this is a test 123"),
@@ -825,7 +828,7 @@ yielding_test() ->
                   end,
                   Values),
     educkdb:appender_flush(Appender),
-    {ok, []} = educkdb:squery(Conn, "commit;"),
+    {ok, _} = educkdb:squery(Conn, "commit;"),
 
     ?assertEqual({ok, [#{ name => <<"count">>, type => bigint, data => [length(Values)] }]}, educkdb:squery(Conn, "select count(*) as count from test;")),
 
@@ -865,7 +868,8 @@ garbage_collect_test() ->
                 {ok, Res3} = educkdb:query(Conn, "insert into test values(20, '20');"),
                 {ok, Res4} = educkdb:query(Conn, "select * from test;"),
 
-                ?assertEqual([], educkdb:extract_result(Res1)),
+                ?assertEqual([#{ data => [], name => <<"Count">>, type => bigint }],
+                             educkdb:extract_result(Res1)),
                 ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
                              educkdb:extract_result(Res2)),
                 ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
@@ -893,7 +897,7 @@ extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a integer);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
     C2 = educkdb:get_chunk(R2, 0),
@@ -911,7 +915,7 @@ boolean_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a boolean, b boolean);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (null, true), (false, null), (true, true), (false, false), (true, false);"),
     ?assertEqual(
@@ -939,7 +943,7 @@ signed_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a smallint, b tinyint, c integer, d bigint);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (-10, -10, -10, -10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:get_chunk(R2, 0),
@@ -972,7 +976,7 @@ unsigned_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a usmallint, b utinyint, c uinteger, d ubigint);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10, 10, 10, 10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:get_chunk(R2, 0),
@@ -1007,7 +1011,7 @@ float_and_double_extract2_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a float, b double);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (1.0, 10.1), (2.0, 11.1), (3.0, 12.2);"),
     C2 = educkdb:get_chunk(R2, 0),
@@ -1032,7 +1036,7 @@ varchar_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a varchar, b varchar);"),
-    0 = educkdb:chunk_count(R1),
+    1 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
     C2 = educkdb:get_chunk(R2, 0),
@@ -1052,8 +1056,7 @@ hugeint_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a hugeint);"),
-
+    {ok, _} = educkdb:squery(Conn, "create table test(a hugeint);"),
 
     A = educkdb:integer_to_hugeint(-170141183460469231731687303715884105727),
     B = educkdb:integer_to_hugeint(-1111),
@@ -1099,7 +1102,7 @@ uuid_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a uuid);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a uuid);"),
     {ok, _} = educkdb:squery(Conn, "insert into test values('00112233-4455-6677-8899-aabbccddeeff')"),
     {ok, _} = educkdb:squery(Conn, "insert into test values('550e8400-e29b-41d4-a716-446655440000')"),
     {ok, _} = educkdb:squery(Conn, "insert into test values('ffffffff-ffff-ffff-ffff-ffffffffffff')"),
@@ -1114,7 +1117,7 @@ blob_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a blob);"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a blob);"),
 
     {ok, [#{ data := [ <<>> ] }]} = educkdb:squery(Conn, "select ''::blob"),
     {ok, [#{ data := [ <<"1234">> ] }]} = educkdb:squery(Conn, "select '1234'::blob"),
@@ -1135,7 +1138,7 @@ enum_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
+    {ok, _} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
 
     {ok, [#{ data := [ <<"orange">> ], type := enum }]} = educkdb:squery(Conn, "select 'orange'::rainbow"),
     {ok, [#{ data := [ <<"red">>, null, <<"orange">>, <<"yellow">>, <<"green">> ], type := enum }]}
@@ -1186,7 +1189,7 @@ struct_table_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, []} = educkdb:squery(Conn, "create table test(a row(i integer, j integer));"),
+    {ok, _} = educkdb:squery(Conn, "create table test(a row(i integer, j integer));"),
 
     ?assertMatch({ok, []}, educkdb:squery(Conn, "SELECT * from test;")),
 
