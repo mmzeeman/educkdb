@@ -20,12 +20,15 @@ jobs:
       image: erlang:${{ matrix.otp_version }}
     
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
+        uses: thejerrybao/setup-swap-space@v1
         with:
-          swap-size-gb: 8
+            swap-space-path: /swapfile
+            swap-size-gb: 8
+            remove-existing-swap-files: true
 
       - name: Compile
         run: make
