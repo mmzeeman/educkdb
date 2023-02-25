@@ -11,7 +11,7 @@
 %% limitations under the License.
 %%
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022 Maas-Maarten Zeeman
+%% @copyright 2022-2023 Maas-Maarten Zeeman
 %%
 %% @doc Test suite for educkdb
 %%
