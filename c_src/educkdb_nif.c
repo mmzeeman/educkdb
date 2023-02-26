@@ -236,7 +236,6 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_STRUCT:       return "struct";
         case DUCKDB_TYPE_MAP:          return "map";
         case DUCKDB_TYPE_UUID:         return "uuid";
-        case DUCKDB_TYPE_JSON:         return "json";
     }
 }
 
@@ -1124,8 +1123,6 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
             return extract_data_map(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
-        case DUCKDB_TYPE_JSON:
-            return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, offset, count);
         default:
             return extract_data_todo(env, offset, count);
     }
