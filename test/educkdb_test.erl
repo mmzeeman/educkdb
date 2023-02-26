@@ -1222,10 +1222,13 @@ map_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    %% [TODO] This crashes the VM with duckdb v0.7.0
-    %% ?assertMatch({ok, [#{ data := [ #map{ keys = [1, 5, 2, 12], values = [<<"a">>, <<"e">>, <<"b">>, <<"c">>]} ] } ]},
-    %%             educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
-
+    ?assertMatch({ok, [#{ data := [ #map{ keys = [1, 5, 2, 12],
+                                          values = [<<"a">>, <<"e">>, <<"b">>, <<"c">>]
+                                        }
+                                  ]
+                        }]
+                 },
+                 educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
 
     ok.
 
