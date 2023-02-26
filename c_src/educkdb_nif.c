@@ -283,31 +283,40 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     if(size <= 0)
         return make_error_tuple(env, "filename");
 
-    // create the configuration object
-    if (duckdb_create_config(&config) == DuckDBError) {
-        return make_error_tuple(env, "create_config");
-    }
-
+    // Loop through the map with options.
     if(!enif_map_iterator_create(env, argv[1], &opts_iter, ERL_NIF_MAP_ITERATOR_FIRST)) {
         return enif_make_badarg(env);
+    }
+    if (duckdb_create_config(&config) == DuckDBError) {
+        return make_error_tuple(env, "create_config");
     }
     while(enif_map_iterator_get_pair(env, &opts_iter, &key, &value)) {
         char key_str[50];
         char value_str[50];
 
-        if(enif_get_atom(env, argv[1], key_str, sizeof(key_str), ERL_NIF_LATIN1)) {
-            continue;
+        if(!enif_get_atom(env, key, key_str, sizeof(key_str), ERL_NIF_LATIN1)) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "option_key");
         }
 
-        if(enif_get_string(env, argv[0], filename, MAX_PATHNAME, ERL_NIF_LATIN1) <= 0) {
-            continue;
+        if(enif_get_string(env, value, value_str, sizeof(value_str), ERL_NIF_LATIN1) <= 0) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "option_value");
         }
-        
-        duckdb_set_config(&config, key_str, value_str);
+
+        if(duckdb_set_config(config, key_str, value_str) == DuckDBError) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "set_config");
+        }
 
         enif_map_iterator_next(env, &opts_iter);
     }
     enif_map_iterator_destroy(env, &opts_iter);
+
+    // Open the database
 
     database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database));
     if(!database) {
@@ -315,11 +324,13 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
     rc = duckdb_open_ext(filename, &(database->database), config, &open_error);
+    duckdb_destroy_config(&config);
     if(rc == DuckDBError) {
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, open_error, ERL_NIF_LATIN1);
         ERL_NIF_TERM error_tuple = enif_make_tuple2(env, atom_error,
                 enif_make_tuple2(env,
                     make_atom(env, "open"), erl_error_msg));
+
         duckdb_free(open_error);
         return error_tuple;
     }

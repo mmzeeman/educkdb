@@ -46,9 +46,11 @@ educk_db_version_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     ?assertEqual({ok,[#{data => [<<"v0.7.0">>],
-                            name => <<"library_version">>,type => varchar},
-                          #{data => [<<"f7827396d7">>],
-                            name => <<"source_id">>,type => varchar}]},
+                        name => <<"library_version">>,
+                        type => varchar},
+                      #{data => [<<"f7827396d7">>],
+                        name => <<"source_id">>,
+                        type => varchar}]},
                  educkdb:squery(Conn, <<"PRAGMA version;">>)),
 
     ok = educkdb:disconnect(Conn),
@@ -56,12 +58,16 @@ educk_db_version_test() ->
     ok.
 
 open_single_database_test() ->
-    {ok, Db1} = educkdb:open(":memory:"),
-    ok = educkdb:close(Db1),
+    {ok, Db} = educkdb:open(":memory:"),
+    ok = educkdb:close(Db),
+    ok.
 
-    {ok, Db2} = educkdb:open(":memory:", #{threads => "2"}),
-    ok = educkdb:close(Db2),
-
+open_with_threads_option_test() ->
+    {ok, Db} = educkdb:open(":memory:", #{
+                                          max_memory => "2GB",
+                                          threads => "4"
+                                         }),
+    ok = educkdb:close(Db),
     ok.
 
 open_and_connect_test() ->
@@ -88,8 +94,8 @@ open_options_test() ->
         = educkdb:open("README.md", #{ access_mode => "READ_ONLY" }),
 
     %% [TODO] this crashes the VM with duckdb v0.7.0
-    %%{error,{open,"IO Error: Cannot open file \".\": Is a directory"}}
-    %%    = educkdb:open(".", #{ access_mode => "READ_ONLY" }),
+    %{error,{open,"IO Error: Cannot open file \".\": Is a directory"}}
+    %    = educkdb:open(".", #{ access_mode => "READ_ONLY" }),
 
     ok.
 
