@@ -1024,26 +1024,44 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
 }
 
 static ERL_NIF_TERM
-extract_data_map(ErlNifEnv *env, duckdb_vector vector,  duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
+extract_data_map(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
     ERL_NIF_TERM data = enif_make_list(env, 0);
+
+    fprintf(stderr, "Extract map: count(%d) offset(%d)\n", count, offset);
 
     for(idx_t i=count+offset; i-- > offset; ) {
         ERL_NIF_TERM cell;
 
         if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, 0);
-            duckdb_logical_type value_child_type = duckdb_struct_type_child_type(logical_type, 1);
+            duckdb_logical_type key_child_type = duckdb_map_type_key_type(logical_type);
+            duckdb_logical_type value_child_type = duckdb_map_type_value_type(logical_type);
 
+            fprintf(stderr, "%p\n", vector);
+
+            fprintf(stderr, "%p\n", key_child_type);
+            fprintf(stderr, "%p\n", value_child_type);
+
+            fprintf(stderr, "get key vector\n");
             duckdb_vector key_child_vector = duckdb_struct_vector_get_child(vector, 0);
-            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
+            fprintf(stderr, "key vector: %p\n", key_child_vector);
                 
             ERL_NIF_TERM list, keys, values, tail;
 
-            list = extract_data(env, key_child_type, key_child_vector, i, 1);
-            enif_get_list_cell(env, list, &keys, &tail);
+            fprintf(stderr, "keys\n");
 
+            list = extract_data(env, key_child_type, key_child_vector, i, 1);
+
+            fprintf(stderr, "list: %p\n", list);
+            enif_get_list_cell(env, list, &keys, &tail);
+            fprintf(stderr, "got key list\n");
+
+            fprintf(stderr, "get value vector\n");
+            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
+            fprintf(stderr, "value vector: %p\n", value_child_vector);
             list = extract_data(env, value_child_type, value_child_vector, i, 1);
             enif_get_list_cell(env, list, &values, &tail);
+
+            fprintf(stderr, "got value list\n");
 
             duckdb_destroy_logical_type(&key_child_type);
             duckdb_destroy_logical_type(&value_child_type);
