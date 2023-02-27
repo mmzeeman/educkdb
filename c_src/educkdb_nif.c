@@ -236,6 +236,8 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_STRUCT:       return "struct";
         case DUCKDB_TYPE_MAP:          return "map";
         case DUCKDB_TYPE_UUID:         return "uuid";
+        case DUCKDB_TYPE_UNION:        return "union";
+        case DUCKDB_TYPE_BIT:          return "bit";
     }
 }
 
@@ -1024,60 +1026,6 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
 }
 
 static ERL_NIF_TERM
-extract_data_map(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    fprintf(stderr, "Extract map: count(%d) offset(%d)\n", count, offset);
-
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_logical_type key_child_type = duckdb_map_type_key_type(logical_type);
-            duckdb_logical_type value_child_type = duckdb_map_type_value_type(logical_type);
-
-            fprintf(stderr, "%p\n", vector);
-
-            fprintf(stderr, "%p\n", key_child_type);
-            fprintf(stderr, "%p\n", value_child_type);
-
-            fprintf(stderr, "get key vector\n");
-            duckdb_vector key_child_vector = duckdb_struct_vector_get_child(vector, 0);
-            fprintf(stderr, "key vector: %p\n", key_child_vector);
-                
-            ERL_NIF_TERM list, keys, values, tail;
-
-            fprintf(stderr, "keys\n");
-
-            list = extract_data(env, key_child_type, key_child_vector, i, 1);
-
-            fprintf(stderr, "list: %p\n", list);
-            enif_get_list_cell(env, list, &keys, &tail);
-            fprintf(stderr, "got key list\n");
-
-            fprintf(stderr, "get value vector\n");
-            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
-            fprintf(stderr, "value vector: %p\n", value_child_vector);
-            list = extract_data(env, value_child_type, value_child_vector, i, 1);
-            enif_get_list_cell(env, list, &values, &tail);
-
-            fprintf(stderr, "got value list\n");
-
-            duckdb_destroy_logical_type(&key_child_type);
-            duckdb_destroy_logical_type(&value_child_type);
-
-            cell = enif_make_tuple3(env, make_atom(env, "map"), keys, values);
-        } else {
-            cell = atom_null;
-        }
-
-        data = enif_make_list_cell(env, cell, data);
-    }
-
-    return data;
-}
- 
-static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
@@ -1148,8 +1096,6 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
             return extract_data_list(env, vector, logical_type, (duckdb_list_entry_t *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_STRUCT:
             return extract_data_struct(env, vector, logical_type, validity_mask, offset, count);
-        case DUCKDB_TYPE_MAP:  
-            return extract_data_map(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
         default:
