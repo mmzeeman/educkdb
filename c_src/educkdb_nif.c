@@ -236,7 +236,8 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_STRUCT:       return "struct";
         case DUCKDB_TYPE_MAP:          return "map";
         case DUCKDB_TYPE_UUID:         return "uuid";
-        case DUCKDB_TYPE_JSON:         return "json";
+        case DUCKDB_TYPE_UNION:        return "union";
+        case DUCKDB_TYPE_BIT:          return "bit";
     }
 }
 
@@ -284,31 +285,40 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     if(size <= 0)
         return make_error_tuple(env, "filename");
 
-    // create the configuration object
-    if (duckdb_create_config(&config) == DuckDBError) {
-        return make_error_tuple(env, "create_config");
-    }
-
+    // Loop through the map with options.
     if(!enif_map_iterator_create(env, argv[1], &opts_iter, ERL_NIF_MAP_ITERATOR_FIRST)) {
         return enif_make_badarg(env);
+    }
+    if (duckdb_create_config(&config) == DuckDBError) {
+        return make_error_tuple(env, "create_config");
     }
     while(enif_map_iterator_get_pair(env, &opts_iter, &key, &value)) {
         char key_str[50];
         char value_str[50];
 
-        if(enif_get_atom(env, argv[1], key_str, sizeof(key_str), ERL_NIF_LATIN1)) {
-            continue;
+        if(!enif_get_atom(env, key, key_str, sizeof(key_str), ERL_NIF_LATIN1)) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "option_key");
         }
 
-        if(enif_get_string(env, argv[0], filename, MAX_PATHNAME, ERL_NIF_LATIN1) <= 0) {
-            continue;
+        if(enif_get_string(env, value, value_str, sizeof(value_str), ERL_NIF_LATIN1) <= 0) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "option_value");
         }
-        
-        duckdb_set_config(&config, key_str, value_str);
+
+        if(duckdb_set_config(config, key_str, value_str) == DuckDBError) {
+            enif_map_iterator_destroy(env, &opts_iter);
+            duckdb_destroy_config(&config);
+            return make_error_tuple(env, "set_config");
+        }
 
         enif_map_iterator_next(env, &opts_iter);
     }
     enif_map_iterator_destroy(env, &opts_iter);
+
+    // Open the database
 
     database = enif_alloc_resource(educkdb_database_type, sizeof(educkdb_database));
     if(!database) {
@@ -316,11 +326,13 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
     rc = duckdb_open_ext(filename, &(database->database), config, &open_error);
+    duckdb_destroy_config(&config);
     if(rc == DuckDBError) {
         ERL_NIF_TERM erl_error_msg = enif_make_string(env, open_error, ERL_NIF_LATIN1);
         ERL_NIF_TERM error_tuple = enif_make_tuple2(env, atom_error,
                 enif_make_tuple2(env,
                     make_atom(env, "open"), erl_error_msg));
+
         duckdb_free(open_error);
         return error_tuple;
     }
@@ -1014,42 +1026,6 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
 }
 
 static ERL_NIF_TERM
-extract_data_map(ErlNifEnv *env, duckdb_vector vector,  duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_logical_type key_child_type = duckdb_struct_type_child_type(logical_type, 0);
-            duckdb_logical_type value_child_type = duckdb_struct_type_child_type(logical_type, 1);
-
-            duckdb_vector key_child_vector = duckdb_struct_vector_get_child(vector, 0);
-            duckdb_vector value_child_vector = duckdb_struct_vector_get_child(vector, 1);
-                
-            ERL_NIF_TERM list, keys, values, tail;
-
-            list = extract_data(env, key_child_type, key_child_vector, i, 1);
-            enif_get_list_cell(env, list, &keys, &tail);
-
-            list = extract_data(env, value_child_type, value_child_vector, i, 1);
-            enif_get_list_cell(env, list, &values, &tail);
-
-            duckdb_destroy_logical_type(&key_child_type);
-            duckdb_destroy_logical_type(&value_child_type);
-
-            cell = enif_make_tuple3(env, make_atom(env, "map"), keys, values);
-        } else {
-            cell = atom_null;
-        }
-
-        data = enif_make_list_cell(env, cell, data);
-    }
-
-    return data;
-}
- 
-static ERL_NIF_TERM
 extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
@@ -1120,12 +1096,8 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
             return extract_data_list(env, vector, logical_type, (duckdb_list_entry_t *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_STRUCT:
             return extract_data_struct(env, vector, logical_type, validity_mask, offset, count);
-        case DUCKDB_TYPE_MAP:  
-            return extract_data_map(env, vector, logical_type, validity_mask, offset, count);
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
-        case DUCKDB_TYPE_JSON:
-            return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, offset, count);
         default:
             return extract_data_todo(env, offset, count);
     }
