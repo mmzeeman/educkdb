@@ -1210,7 +1210,7 @@ struct_table_test() ->
     {ok, _} = educkdb:squery(Conn, "insert into test values ({i: 10, j: 20});"),
     {ok, _} = educkdb:squery(Conn, "insert into test values ({i: 123, j: 456});"),
 
-    ?assertMatch({ok, [#{ data := [null, #{<<"i">> := 10, <<"j">> := 20}, #{ <<"i">> := 123, <<"j">> := 456} ],
+    ?assertMatch({ok, [#{ data := [#{<<"i">> := 10, <<"j">> := 20}, #{ <<"i">> := 123, <<"j">> := 456}, null],
                           name := <<"a">>,
                           type := struct }]},
                  educkdb:squery(Conn, "SELECT * from test order by a.i;")),

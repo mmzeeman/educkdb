@@ -71,19 +71,6 @@ typedef struct {
 } educkdb_appender;
 
 // Not exported for c-api, see: string_type.hpp
-/*
-typedef union {
-    struct {
-        uint32_t length;
-        char prefix[4];
-        char *ptr;
-    } pointer;
-    struct {
-        uint32_t length;
-        char inlined[12];
-    } inlined;
-} duckdb_string_t;
-*/
 
 // Not exported for c api. Search for list_entry_t in header files.
 typedef struct {
@@ -859,16 +846,9 @@ extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *val
 
         if(validity_mask == NULL || is_valid(validity_mask, i)) {
             duckdb_string_t value = *(vector_data + i);
-
-            /*
-            if(value.pointer.length > 12) {
-                cell = make_binary(env, value.pointer.ptr, value.pointer.length);
-            } else {
-                cell = make_binary(env, value.inlined.inlined, value.inlined.length);
-            }
-            */
-
-            cell = make_binary(env, duckdb_string_t_data(&value), duckdb_string_t_length(value));
+            cell = make_binary(env,
+                    duckdb_string_t_data(&value),
+                    duckdb_string_t_length(value));
         } else {
             cell = atom_null;
         }
