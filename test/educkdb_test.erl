@@ -93,9 +93,9 @@ open_options_test() ->
     {error, {open, "IO Error: The file \"README.md\" exists, but it is not a valid DuckDB database file!"}}
         = educkdb:open("README.md", #{ access_mode => "READ_ONLY" }),
 
-    %% [TODO] this crashes the VM with duckdb v0.7.0
-    %{error,{open,"IO Error: Cannot open file \".\": Is a directory"}}
-    %    = educkdb:open(".", #{ access_mode => "READ_ONLY" }),
+    %% Check opening directory, this used to crash v0.7.0
+    {error,{open,"IO Error: Could not read from file \".\": Is a directory"}}
+        = educkdb:open(".", #{ access_mode => "READ_ONLY" }),
 
     ok.
 
