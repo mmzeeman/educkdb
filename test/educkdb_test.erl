@@ -1149,9 +1149,9 @@ enum_test() ->
     {ok, _} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
 
     {ok, [#{ data := [ <<"orange">> ], type := enum }]} = educkdb:squery(Conn, "select 'orange'::rainbow"),
-    %% [TODO] check query syntax
-    %% {ok, [#{ data := [ <<"red">>, null, <<"orange">>, <<"yellow">>, <<"green">> ], type := enum }]}
-    %%  = educkdb:squery(Conn, "select * from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow))"),
+
+    ?assertEqual({ok, [#{ data => [ <<"red">>, null, <<"orange">>, <<"yellow">>, <<"green">> ], name => <<"b">>, type => enum }]},
+                 educkdb:squery(Conn, "select a::rainbow as b from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow)) color(a) ")),
 
     ok.
 
