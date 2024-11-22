@@ -481,8 +481,9 @@ appender_end_row_test() ->
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
-    {error, {appender, "Invalid Input Error: Call to EndRow before all rows have been appended to!"}}
-        =  educkdb:appender_end_row(Appender),
+    ?assertEqual(
+       {error, {appender, "Call to EndRow before all columns have been appended to!"}},
+       educkdb:appender_end_row(Appender)),
 
     ok.
 
