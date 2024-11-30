@@ -31,7 +31,6 @@
 #define MAX_PATHNAME 512            /* unfortunately not in duckdb.h. */
 
 #define DAY_EPOCH 719528            /* days since {0, 1, 1} -> {1970, 1, 1} */
-#define MICS_EPOCH 62167219200000000    
 
 #define NIF_NAME "educkdb_nif"
 
@@ -1840,7 +1839,7 @@ educkdb_bind_timestamp(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    timestamp.micros = value - MICS_EPOCH;
+    timestamp.micros = value;
     if(duckdb_bind_timestamp(stmt->statement, (idx_t) index, timestamp) == DuckDBError) {
         return atom_error;
     }
@@ -2351,7 +2350,7 @@ educkdb_append_timestamp(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    timestamp.micros = value - MICS_EPOCH;
+    timestamp.micros = value;
     if(duckdb_append_timestamp(appender->appender, timestamp) == DuckDBError) {
         return get_appender_error(env, appender->appender);
     }
