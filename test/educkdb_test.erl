@@ -1142,6 +1142,12 @@ blob_test() ->
 
     ok.
 
+uhugeint_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    ?assertMatch({ok, [#{ data := [ { no_extract, uhugeint } ]}]}, educkdb:squery(Conn, "SELECT 1::uhugeint;")),
+    ok.
+
 enum_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -1154,6 +1160,20 @@ enum_test() ->
                  educkdb:squery(Conn, "select a::rainbow as b from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow)) color(a) ")),
 
     ok.
+
+%%parquet_install_test() ->
+%%    {ok, Db} = educkdb:open(":memory:"),
+%%    {ok, Conn} = educkdb:connect(Db),
+%%    {ok, []}  = educkdb:squery(Conn, "INSTALL parquet"),
+%%    ok.
+
+%% https_install_test() ->
+%%     {ok, Db} = educkdb:open(":memory:"),
+%%    {ok, Conn} = educkdb:connect(Db),
+%%     {ok, []} = educkdb:squery(Conn, "INSTALL sqlite"),
+%%     {ok, []} = educkdb:squery(Conn, "LOAD sqlite"),
+%%     ok.
+
 
 list_test() ->
     {ok, Db} = educkdb:open(":memory:"),
@@ -1232,7 +1252,7 @@ map_test() ->
     %%             },
     %%             educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
 
-    ?assertMatch({ok, [#{ data := [ todo ] }] },
+    ?assertMatch({ok, [#{ data := [ { no_extract, map }] }] },
                  educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
 
 

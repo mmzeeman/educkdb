@@ -1012,11 +1012,11 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
 }
 
 static ERL_NIF_TERM
-extract_data_todo(ErlNifEnv *env, uint64_t offset, uint64_t count) {
+extract_data_no_extract(ErlNifEnv *env, const char *type_name, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data = enif_make_list(env, 0);
 
     for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell = make_atom(env, "todo");
+        ERL_NIF_TERM cell = enif_make_tuple2(env, make_atom(env, "no_extract"), make_atom(env, type_name));
         data = enif_make_list_cell(env, cell, data);
     }
 
@@ -1065,27 +1065,65 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
 
         // Interval
         case DUCKDB_TYPE_INTERVAL:
-            return extract_data_todo(env, offset, count);
+            return extract_data_no_extract(env, "interval", offset, count);
+        
+        // Large integers
         case DUCKDB_TYPE_HUGEINT:
             return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, offset, count);
+        case DUCKDB_TYPE_UHUGEINT:
+            return extract_data_no_extract(env, "uhugeint", offset, count);
+            
+        // Binary like types
         case DUCKDB_TYPE_VARCHAR:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_BLOB:
             return extract_data_varchar(env, (duckdb_string_t *) data, validity_mask, offset, count);
+
+        case DUCKDB_TYPE_DECIMAL:
+            return extract_data_no_extract(env, "decimal", offset, count);
+
+        // Timestamps
         case DUCKDB_TYPE_TIMESTAMP_S:
+            return extract_data_no_extract(env, "timestamp_s", offset, count);
         case DUCKDB_TYPE_TIMESTAMP_MS:
+            return extract_data_no_extract(env, "timestamp_ms", offset, count);
         case DUCKDB_TYPE_TIMESTAMP_NS:
-            return extract_data_todo(env, offset, count);
+            return extract_data_no_extract(env, "timestamp_ns", offset, count);
+
+        // Compound types
         case DUCKDB_TYPE_ENUM:
             return extract_data_enum(env, logical_type, data, validity_mask, offset, count);
         case DUCKDB_TYPE_LIST:
             return extract_data_list(env, vector, logical_type, (duckdb_list_entry_t *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_STRUCT:
             return extract_data_struct(env, vector, logical_type, validity_mask, offset, count);
+        case DUCKDB_TYPE_MAP:
+            return extract_data_no_extract(env, "map", offset, count);
+        case DUCKDB_TYPE_ARRAY:
+            return extract_data_no_extract(env, "array", offset, count);
+
         case DUCKDB_TYPE_UUID:
             return extract_data_uuid(env, (duckdb_hugeint *) data, validity_mask, offset, count);
+
+        case DUCKDB_TYPE_UNION:
+            return extract_data_no_extract(env, "union", offset, count);
+
+        case DUCKDB_TYPE_BIT:
+            return extract_data_no_extract(env, "bit", offset, count);
+
+        case DUCKDB_TYPE_TIME_TZ:
+            return extract_data_no_extract(env, "time_tz", offset, count);
+        case DUCKDB_TYPE_TIMESTAMP_TZ:
+            return extract_data_no_extract(env, "timestamp_tz", offset, count);
+
+        case DUCKDB_TYPE_ANY:
+            return extract_data_no_extract(env, "any", offset, count);
+
+        case DUCKDB_TYPE_VARINT:
+            return extract_data_no_extract(env, "varint", offset, count);
+
         default:
-            return extract_data_todo(env, offset, count);
+            return extract_data_no_extract(env, "default", offset, count);
     }
 }
 
@@ -1228,7 +1266,7 @@ educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
     if(!echunk) {
-        duckdb_destroy_data_chunk(chunk);
+        duckdb_destroy_data_chunk(&chunk);
         return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
@@ -1251,7 +1289,7 @@ make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) {
 
         educkdb_data_chunk *echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
         if(echunk == NULL) {
-            duckdb_destroy_data_chunk(chunk);
+            duckdb_destroy_data_chunk(&chunk);
             return enif_raise_exception(env, make_atom(env, "no_memory"));
         }
 
