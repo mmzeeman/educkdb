@@ -1,10 +1,10 @@
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022-2023 Maas-Maarten Zeeman
+%% @copyright 2022-2024 Maas-Maarten Zeeman
 %%
 %% @doc Low level erlang API for duckdb databases.
 %% @end
 
-%% Copyright 2022-2023 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% Copyright 2022-2024 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@
 
     %% Results
     extract_result/1,
+    fetch_chunk/1,
     get_chunk/2,
     get_chunks/1,
     chunk_count/1,
@@ -461,16 +462,24 @@ bind_null(_Stmt, _Index) ->
          DataChunks :: list(data_chunk()).
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
+ 
+%% @doc Fetches a data chunk from a result. The function should be called
+%% repeatedly until the result is exhausted.
+-spec fetch_chunk(QueryResult) -> DataChunk | '$end'
+    when QueryResult :: result(),
+         DataChunk :: data_chunk().
+fetch_chunk(_Result) -> 
+    erlang:nif_error(nif_library_not_loaded).
 
-%% @doc Get a data chunk from a query result.
- -spec get_chunk(QueryResult, Idx) -> DataChunk 
+%% @doc Get a data chunk from a query result. (deprecated)
+-spec get_chunk(QueryResult, Idx) -> DataChunk 
     when QueryResult :: result(),
          Idx :: non_neg_integer(),
          DataChunk :: data_chunk().
 get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc Get the number of data chunks in a query result.
+%% @doc Get the number of data chunks in a query result. (deprecated)
 -spec chunk_count(QueryResult) -> Count
     when QueryResult :: result(),
          Count :: uint64().
