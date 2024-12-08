@@ -62,10 +62,10 @@
 
     %% Chunks
     extract_chunk/1, % old-style
-    chunk_size/1,
-    % chunk_columns/1,
     chunk_column_count/1,
     chunk_column_types/1,
+    chunk_columns/1,
+    chunk_size/1,
 
     appender_create/3,
     append_boolean/2,
@@ -515,7 +515,13 @@ chunk_column_count(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Get the column types of the chunk
+%% [todo] spec..
 chunk_column_types(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Get the columns data of the chunk
+%% [todo] spec
+chunk_columns(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the number of tuples in th data chunk.

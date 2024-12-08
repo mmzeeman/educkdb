@@ -169,6 +169,7 @@ chunk_test() ->
     ?assertEqual(1, educkdb:chunk_column_count(Chunk1)),
     ?assertEqual(1, educkdb:chunk_size(Chunk1)),
     ?assertEqual([bigint], educkdb:chunk_column_types(Chunk1)),
+    ?assertEqual([[3]], educkdb:chunk_columns(Chunk1)),
 
 
     {ok, Res2} = educkdb:query(Conn, "select * from test;"),
@@ -177,6 +178,7 @@ chunk_test() ->
     ?assertEqual(1, educkdb:chunk_column_count(Chunk2)),
     ?assertEqual(3, educkdb:chunk_size(Chunk2)),
     ?assertEqual([integer], educkdb:chunk_column_types(Chunk2)),
+    ?assertEqual([[1,2,3]], educkdb:chunk_columns(Chunk2)),
 
     ok.
 

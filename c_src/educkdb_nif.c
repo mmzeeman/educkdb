@@ -1184,6 +1184,25 @@ extract_chunk_types(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_count)
     return enif_make_list_from_array(env, column, column_count); 
 }
 
+static ERL_NIF_TERM
+extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_count) {
+    ERL_NIF_TERM column[column_count];
+    idx_t tuple_count = duckdb_data_chunk_get_size(chunk);
+
+    for(idx_t i=0; i < column_count; i++) {
+        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, i);
+        duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
+        duckdb_type type_id = duckdb_get_type_id(logical_type);
+
+        ERL_NIF_TERM data = extract_data(env, logical_type, vector, 0, tuple_count);
+
+        column[i] = data;
+    }
+
+    return enif_make_list_from_array(env, column, column_count); 
+}
+
+
 /**
  * Chunks
  */
@@ -1400,6 +1419,21 @@ educkdb_chunk_get_column_types(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv
     }
 
     return extract_chunk_types(env, chunk->data_chunk, duckdb_data_chunk_get_column_count(chunk->data_chunk));
+}
+
+static ERL_NIF_TERM
+educkdb_chunk_get_columns(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_data_chunk *chunk;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_data_chunk_type, (void **) &chunk)) {
+        return enif_make_badarg(env);
+    }
+
+    return extract_chunk_columns(env, chunk->data_chunk, duckdb_data_chunk_get_column_count(chunk->data_chunk));
 }
 
 static ERL_NIF_TERM
@@ -2627,6 +2661,7 @@ static ErlNifFunc nif_funcs[] = {
     {"extract_chunk", 1, educkdb_chunk_extract},
     {"chunk_column_count", 1, educkdb_chunk_get_column_count},
     {"chunk_column_types", 1, educkdb_chunk_get_column_types},
+    {"chunk_columns", 1, educkdb_chunk_get_columns},
     {"chunk_size", 1, educkdb_chunk_get_size},
 
     // Prepare
