@@ -61,9 +61,11 @@
     column_names/1,
 
     %% Chunks
-    extract_chunk/1,
-    get_chunk_column_count/1,
-    get_chunk_size/1,
+    extract_chunk/1, % old-style
+    chunk_size/1,
+    % chunk_columns/1,
+    chunk_column_count/1,
+    chunk_column_types/1,
 
     appender_create/3,
     append_boolean/2,
@@ -506,18 +508,23 @@ extract_chunk(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the number of columns in the data chunk.
--spec get_chunk_column_count(DataChunk) -> ColumnCount
+-spec chunk_column_count(DataChunk) -> ColumnCount
     when DataChunk :: data_chunk(),
          ColumnCount :: uint64().
-get_chunk_column_count(_Chunk) ->
+chunk_column_count(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Get the column types of the chunk
+chunk_column_types(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the number of tuples in th data chunk.
--spec get_chunk_size(DataChunk) -> TupleCount
+-spec chunk_size(DataChunk) -> TupleCount
     when DataChunk :: data_chunk(),
          TupleCount :: uint64().
-get_chunk_size(_Chunk) ->
+chunk_size(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
+
 
 %%
 %% Appender Interface
@@ -710,6 +717,28 @@ appender_flush(_Appender) ->
 %%
 
 %% @doc Extract a query result of the first data chunk.
+%% -spec extract_result(QueryResult) -> Chunks
+%%     when QueryResult :: result(),
+%%          Chunks :: [ named_column() ]. 
+%% extract_result(QueryResult) ->
+%%     extract_result1(QueryResult).
+
+%% extract_result1(Result) ->
+
+    %case fetch_chunk(Result) of
+    %    '$end' ->
+    %        #{ column_names => column_names(Result), 
+    %           chunks => lists:reverse(Acc) };
+    %    Chunk ->
+    %        Columns = extract_chunk(Chunk),
+    %        extract_result1(Result, [Columns | Acc])
+    %end.
+
+%%     Names = column_names(Result),
+ %%    Columns = extract_chunk(Chunk),
+%%     lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
+
+%% @doc Extract a query result of the first data chunk.
 -spec extract_result(QueryResult) -> Chunks
     when QueryResult :: result(),
          Chunks :: [ named_column() ]. 
@@ -743,10 +772,11 @@ squery(Connection, Sql) ->
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, [ named_column() ]} | {error, _}.
 execute(Stmt) ->
-    case educkdb:execute_prepared(Stmt) of
+    case execute_prepared(Stmt) of
         {ok, Result} ->
-            educkdb:extract_result(Result);
-        {error, _}=E ->E
+            extract_result(Result);
+        {error, _}=E ->
+            E
     end.
 
 %%

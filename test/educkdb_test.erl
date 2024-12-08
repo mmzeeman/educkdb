@@ -166,14 +166,17 @@ chunk_test() ->
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     [Chunk1] = educkdb:get_chunks(Res1),
     ?assert(is_reference(Chunk1)),
-    ?assertEqual(1, educkdb:get_chunk_column_count(Chunk1)),
-    ?assertEqual(1, educkdb:get_chunk_size(Chunk1)),
+    ?assertEqual(1, educkdb:chunk_column_count(Chunk1)),
+    ?assertEqual(1, educkdb:chunk_size(Chunk1)),
+    ?assertEqual([bigint], educkdb:chunk_column_types(Chunk1)),
+
 
     {ok, Res2} = educkdb:query(Conn, "select * from test;"),
     [Chunk2] = educkdb:get_chunks(Res2),
     ?assert(is_reference(Chunk2)),
-    ?assertEqual(1, educkdb:get_chunk_column_count(Chunk2)),
-    ?assertEqual(3, educkdb:get_chunk_size(Chunk2)),
+    ?assertEqual(1, educkdb:chunk_column_count(Chunk2)),
+    ?assertEqual(3, educkdb:chunk_size(Chunk2)),
+    ?assertEqual([integer], educkdb:chunk_column_types(Chunk2)),
 
     ok.
 
@@ -915,6 +918,26 @@ extract_test() ->
     C3 = educkdb:get_chunk(R3, 0),
     ?assertEqual( [ #{ type => integer, data => [10, 11, 12] } ],
        educkdb:extract_chunk(C3)),
+
+    ok.
+
+fetch_chunk_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:query(Conn, "create table test(a integer);"),
+    '$end' = educkdb:fetch_chunk(R1),
+
+    {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
+    C2 = educkdb:fetch_chunk(R2),
+    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
+    '$end' = educkdb:fetch_chunk(R2),
+
+    {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
+    C3 = educkdb:fetch_chunk(R3),
+    ?assertEqual( [ #{ type => integer, data => [10, 11, 12] } ],
+       educkdb:extract_chunk(C3)),
+    '$end' = educkdb:fetch_chunk(R3),
 
     ok.
 
