@@ -905,6 +905,19 @@ garbage_collect_test() ->
 
     ok.
 
+multi_chunk_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, R1} = educkdb:squery(Conn, "select range(0, 10000000, 1)"),
+
+
+    ?assertEqual(2, length(maps:get(rows, R1))),
+    
+
+    ok.
+
+
 extract_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
@@ -958,12 +971,8 @@ boolean_extract_test() ->
        ],
        educkdb:extract_result(R2)),
 
-    ?assertEqual(
-       #{ column_types => [bigint],
-          column_names => [<<"Count"],
-          columns => [  [ [ 5 ] ] ]
-        },
-       educkdb:result_extract(R2)),
+    ?assertEqual( #{ types => [bigint], names => [<<"Count">>], columns => [ [ [ 5 ] ] ] },
+                  educkdb:result_extract(R2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     ?assertEqual(

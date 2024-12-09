@@ -762,21 +762,24 @@ extract_result1(Result, N) when N > 0 ->
 result_extract(Result) ->
     case fetch_chunk(Result) of
         '$end' ->
-            #{};
+            Names = column_names(Result),
+            {ok, [ {column, Name, undefined} || Name <- Names], []};
         Chunk ->
-            ColumnNames = column_names(Result),
-            ColumnTypes = chunk_column_types(Chunk),
-            Columns = chunk_columns(Chunk, Result, []),
-            #{ column_names => ColumnNames,
-               column_types => ColumnTypes,
-               columns => Columns }
+            Names = column_names(Result),
+            Types = chunk_column_types(Chunk),
+            Rows = chunk_rows(Chunk, Result, []),
+            {ok, [ {column, Name, Type} || Name <- Names, Type <- Types], Rows}
     end.
 
-chunk_columns('$end', _Result, Chunks) ->
-    lists:reverse(Chunks);
-chunk_columns(Chunk, Result, Chunks) ->
-    Columns = chunk_columns(Chunk),
-    chunk_columns(fetch_chunk(Result), Result, [Columns | Chunks]).
+chunk_rows('$end', _Result, Rows) ->
+    lists:reverse(lists:flatten(Rows));
+chunk_rows(Chunk, Result, Rows) ->
+    R = lists:reverse(
+          lists:map(fun list_to_tuple/1,
+                    transpose(
+                      chunk_columns(Chunk)))),
+
+    chunk_rows(fetch_chunk(Result), Result, [R | Rows]).
 
 
 %% @doc Do a simple sql query without parameters, and retrieve the result from the
@@ -788,7 +791,7 @@ chunk_columns(Chunk, Result, Chunks) ->
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
-            {ok, extract_result(Result)};
+            result_extract(Result);
         {error, _}=E ->
             E
     end.
@@ -810,8 +813,7 @@ execute(Stmt) ->
 %% Utilities
 %% 
 
-transpose(M) ->
-    transpose([[]|_]) -> [];
+transpose([[]|_]) -> [];
 transpose(M) ->
     [ lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
 
