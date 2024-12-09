@@ -958,6 +958,13 @@ boolean_extract_test() ->
        ],
        educkdb:extract_result(R2)),
 
+    ?assertEqual(
+       #{ column_types => [bigint],
+          column_names => [<<"Count"],
+          columns => [  [ [ 5 ] ] ]
+        },
+       educkdb:result_extract(R2)),
+
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     ?assertEqual(
        [ #{ name => <<"a">>, 

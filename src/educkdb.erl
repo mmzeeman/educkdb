@@ -54,6 +54,7 @@
 
     %% Results
     extract_result/1,
+    result_extract/1,
     fetch_chunk/1,
     get_chunk/2,
     get_chunks/1,
@@ -758,6 +759,26 @@ extract_result1(Result, N) when N > 0 ->
     Columns = extract_chunk(Chunk),
     lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
 
+result_extract(Result) ->
+    case fetch_chunk(Result) of
+        '$end' ->
+            #{};
+        Chunk ->
+            ColumnNames = column_names(Result),
+            ColumnTypes = chunk_column_types(Chunk),
+            Columns = chunk_columns(Chunk, Result, []),
+            #{ column_names => ColumnNames,
+               column_types => ColumnTypes,
+               columns => Columns }
+    end.
+
+chunk_columns('$end', _Result, Chunks) ->
+    lists:reverse(Chunks);
+chunk_columns(Chunk, Result, Chunks) ->
+    Columns = chunk_columns(Chunk),
+    chunk_columns(fetch_chunk(Result), Result, [Columns | Chunks]).
+
+
 %% @doc Do a simple sql query without parameters, and retrieve the result from the
 %%      first data chunk.
 -spec squery(Connection, Sql) -> Result
@@ -788,6 +809,11 @@ execute(Stmt) ->
 %%
 %% Utilities
 %% 
+
+transpose(M) ->
+    transpose([[]|_]) -> [];
+transpose(M) ->
+    [ lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
 
 %% @doc Convert a duckdb hugeint record to erlang integer. 
 -spec hugeint_to_integer(Hugeint) -> Integer
