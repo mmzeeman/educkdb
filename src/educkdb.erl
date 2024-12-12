@@ -757,7 +757,10 @@ extract_result1(Result, N) when N > 0 ->
     Chunk = get_chunk(Result, 0),
     Names = column_names(Result),
     Columns = extract_chunk(Chunk),
-    lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
+    lists:zipwith(fun(Column, Name) ->
+                          Column#{ name => Name }
+                  end,
+                  Columns, Names).
 
 result_extract(Result) ->
     case fetch_chunk(Result) of
@@ -770,6 +773,16 @@ result_extract(Result) ->
             Rows = chunk_rows(Chunk, Result, []),
             {ok, [ {column, Name, Type} || Name <- Names, Type <- Types], Rows}
     end.
+
+column_info(Names, Types) ->
+    column_info(Names, Types, []).
+
+column_info([], _, Acc) ->
+    lists:reverse(Acc);
+column_info([N|T], undefined, Acc) ->
+    column_info(T, undefined, [{column, N, undefined}|Acc]);
+column_info([Name|RestNames], [Type|RestTypes], Acc) ->
+    column_info(RestNames, RestTypes, [{column, Name, Type}|Acc]).
 
 chunk_rows('$end', _Result, Rows) ->
     lists:reverse(lists:flatten(Rows));
@@ -791,7 +804,9 @@ chunk_rows(Chunk, Result, Rows) ->
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
+            % extract_result(Resuet);
             result_extract(Result);
+            % ok;
         {error, _}=E ->
             E
     end.
