@@ -366,21 +366,20 @@ extract_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a timestamp);"),
 
-    {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('0-01-01');"),
-    {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('1970-01-01');"),
-    {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2003-12-25');"),
-    {ok, [#{ data := [1]}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2023-4-3 11:23:16.123456');"),
+    {ok, _, [{1}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('0-01-01');"),
+    {ok, _,  [{1}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('1970-01-01');"),
+    {ok, _, [{1}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2003-12-25');"),
+    {ok, _, [{1}]} = educkdb:squery(Conn, "INSERT INTO test VALUES ('2023-4-3 11:23:16.123456');"),
 
     ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => timestamp,
-                 data => [ {{   0,  1,  1}, {0, 0, 0.0}},
-                           {{1970,  1,  1}, {0, 0, 0.0}},
-                           {{2003, 12, 25}, {0, 0, 0.0}},
-                           {{2023,  4,  3}, {11, 23, 16.123456}} ] }
-            ]
-       }, educkdb:squery(Conn, "select * from test order by a")),
+       {ok, [#column{name = <<"a">>, type = timestamp}],
+        [ { {{   0,  1,  1}, {0, 0, 0.0}} },
+          { {{1970,  1,  1}, {0, 0, 0.0}} },
+          { {{2003, 12, 25}, {0, 0, 0.0}} },
+          { {{2023,  4,  3}, {11, 23, 16.123456}} } ] },
+       educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
