@@ -765,13 +765,13 @@ extract_result1(Result, N) when N > 0 ->
 result_extract(Result) ->
     case fetch_chunk(Result) of
         '$end' ->
-            Names = column_names(Result),
-            {ok, [ {column, Name, undefined} || Name <- Names], []};
+            {ok, [], []};
         Chunk ->
             Names = column_names(Result),
             Types = chunk_column_types(Chunk),
+            Info = column_info(Names, Types),
             Rows = chunk_rows(Chunk, Result, []),
-            {ok, [ {column, Name, Type} || Name <- Names, Type <- Types], Rows}
+            {ok, Info, Rows}
     end.
 
 column_info(Names, Types) ->
@@ -780,9 +780,9 @@ column_info(Names, Types) ->
 column_info([], _, Acc) ->
     lists:reverse(Acc);
 column_info([N|T], undefined, Acc) ->
-    column_info(T, undefined, [{column, N, undefined}|Acc]);
+    column_info(T, undefined, [#column{name=N}|Acc]);
 column_info([Name|RestNames], [Type|RestTypes], Acc) ->
-    column_info(RestNames, RestTypes, [{column, Name, Type}|Acc]).
+    column_info(RestNames, RestTypes, [#column{name=Name, type=Type}|Acc]).
 
 chunk_rows('$end', _Result, Rows) ->
     lists:reverse(lists:flatten(Rows));

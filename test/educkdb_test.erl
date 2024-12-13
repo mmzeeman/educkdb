@@ -197,7 +197,7 @@ prepare_error_test() ->
 prepare_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
     Query = "select * from test;",
     {ok, P} = educkdb:prepare(Conn, Query),
 
@@ -212,9 +212,9 @@ bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _} = educkdb:squery(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);"),
+    ?assertEqual({ok, [], []}, educkdb:squery(Conn, "create table test(a TINYINT, b SMALLINT, c INTEGER, d BIGINT);")),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
-    {ok, []} = educkdb:squery(Conn, "select * from test;"),
+    ?assertEqual({ok, [], []}, educkdb:squery(Conn, "select * from test;")),
 
     ok = educkdb:bind_int8(Insert, 1, 0),
     ok = educkdb:bind_int16(Insert, 2, 0),
@@ -251,19 +251,24 @@ bind_int_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, [ #{ data := [?INT8_MIN, -3, 0, 3, ?INT8_MAX] },
-           #{ data := [?INT16_MIN, -3, 0, 3, ?INT16_MAX] },
-           #{ data := [?INT32_MIN, -3, 0, 3, ?INT32_MAX] },
-           #{ data := [?INT64_MIN, -3, 0, 3, ?INT64_MAX] }
-         ]} = educkdb:squery(Conn, "select * from test order by a"), 
-
+    ?assertEqual({ok,
+                  [ #column{name = <<"a">>, type=tinyint},
+                    #column{name = <<"b">>, type=smallint},
+                    #column{name = <<"c">>, type=integer},
+                    #column{name = <<"d">>, type=bigint} ],
+                  [ {?INT8_MIN, ?INT16_MIN, ?INT32_MIN, ?INT64_MIN},
+                    {-3,- 3, -3, -3},
+                    { 0,  0,  0,  0},
+                    { 3,  3,  3,  3},
+                    {?INT8_MAX, ?INT16_MAX, ?INT32_MAX, ?INT64_MAX} ]},
+                 educkdb:squery(Conn, "select * from test order by a")), 
     ok.
 
 bind_unsigned_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _} = educkdb:squery(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a UTINYINT, b USMALLINT, c UINTEGER, d UBIGINT);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2, $3, $4);"),
 
     ok = educkdb:bind_uint8(Insert,  1, 0),
@@ -287,11 +292,14 @@ bind_unsigned_int_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, [ #{ data := [0, ?INT8_MAX, ?UINT8_MAX ] },
-           #{ data := [0, ?INT16_MAX, ?UINT16_MAX ] },
-           #{ data := [0, ?INT32_MAX, ?UINT32_MAX ] },
-           #{ data := [0, ?INT64_MAX, ?UINT64_MAX ] }
-         ]} = educkdb:squery(Conn, "select * from test order by a"),
+    ?assertEqual({ok, [#column{ name = <<"a">>, type = utinyint},
+                       #column{ name = <<"b">>, type = usmallint},
+                       #column{ name = <<"c">>, type = uinteger},
+                       #column{ name = <<"d">>, type = ubigint} ],
+                  [{0, 0, 0, 0},
+                   {?INT8_MAX, ?INT16_MAX, ?INT32_MAX, ?INT64_MAX},
+                   {?UINT8_MAX, ?UINT16_MAX, ?UINT32_MAX , ?UINT64_MAX} ]},
+                 educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
@@ -299,7 +307,7 @@ bind_float_and_double_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_float(Insert, 1, 0.0),
@@ -313,10 +321,11 @@ bind_float_and_double_test() ->
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
     ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => float, data => [0.0, 1.9999999556392617e23] },
-              #{ name => <<"b">>, type => double, data => [0.0, 2.0e23] }
-            ]
-       }, educkdb:squery(Conn, "select * from test order by a")),
+       {ok, [#column{ name = <<"a">>, type = float},
+             #column{ name = <<"b">>, type = double}],
+        [{0.0, 0.0},
+         {1.9999999556392617e23, 2.0e23}]},
+       educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
@@ -324,7 +333,7 @@ bind_date_and_time_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _} = educkdb:squery(Conn, "create table test(a date, b time);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a date, b time);"),
 
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
@@ -832,7 +841,7 @@ yielding_test() ->
     
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a integer, b varchar, c varchar);"),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(a integer, b varchar, c varchar);"),
 
     %% Insert a lot of records to ensure yielding takes place records 
     Values = lists:seq(1, 100000),

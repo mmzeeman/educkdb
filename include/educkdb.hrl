@@ -11,3 +11,8 @@
     keys :: list(),
     values :: list()
 }).
+
+-record(column, {
+    name :: binary(),
+    type :: educkdb:type_name()
+}).
