@@ -386,7 +386,7 @@ extract_timestamp_test() ->
 bind_timestamp_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(a timestamp);"),
 
     %%
     %% Test bind
@@ -408,15 +408,13 @@ bind_timestamp_test() ->
 
     %% Results are returned in fp
     ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => timestamp,
-                 data => [{{   0, 1,  1}, { 0,  0,  0.0}},
-                          {{1970, 8, 11}, { 8,  0,  0.0}},
-                          {{2022, 3, 19}, {22, 36, 23.983105}}] }
-            ]
-       }, educkdb:squery(Conn, "select * from test order by a")),
+       {ok, [#column{ name = <<"a">>, type = timestamp }],
+            [{{{   0, 1,  1}, { 0,  0,  0.0}}},
+             {{{1970, 8, 11}, { 8,  0,  0.0}}},
+             {{{2022, 3, 19}, {22, 36, 23.983105}}} ]},
+       educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
-
 
 bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),
