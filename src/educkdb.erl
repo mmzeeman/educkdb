@@ -53,7 +53,6 @@
     bind_null/2,
 
     %% Results
-    extract_result/1,
     result_extract/1,
     fetch_chunk/1,
     get_chunk/2,
@@ -62,7 +61,6 @@
     column_names/1,
 
     %% Chunks
-    extract_chunk/1, % old-style
     chunk_column_count/1,
     chunk_column_types/1,
     chunk_columns/1,
@@ -160,7 +158,6 @@
                    | list | struct | map
                    | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
 
--type column() :: #{ data := list(data()), type := type_name() }.
 -type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
 
 -type bind_response() :: ok | {error, _}.
@@ -500,14 +497,6 @@ column_names(_Result) ->
 %% Chunks
 %%
 
-%% @doc Extract the data from a data chunk. Chunks contain multiple columns and
-%%      rows. All data in the chunks is extracted.
--spec extract_chunk(DataChunk) -> Columns
-    when DataChunk :: data_chunk(),
-         Columns :: list(column()).
-extract_chunk(_Chunk) ->
-    erlang:nif_error(nif_library_not_loaded).
-
 %% @doc Return the number of columns in the data chunk.
 -spec chunk_column_count(DataChunk) -> ColumnCount
     when DataChunk :: data_chunk(),
@@ -723,45 +712,6 @@ appender_flush(_Appender) ->
 %% Higher Level API
 %%
 
-%% @doc Extract a query result of the first data chunk.
-%% -spec extract_result(QueryResult) -> Chunks
-%%     when QueryResult :: result(),
-%%          Chunks :: [ named_column() ]. 
-%% extract_result(QueryResult) ->
-%%     extract_result1(QueryResult).
-
-%% extract_result1(Result) ->
-
-    %case fetch_chunk(Result) of
-    %    '$end' ->
-    %        #{ column_names => column_names(Result), 
-    %           chunks => lists:reverse(Acc) };
-    %    Chunk ->
-    %        Columns = extract_chunk(Chunk),
-    %        extract_result1(Result, [Columns | Acc])
-    %end.
-
-%%     Names = column_names(Result),
- %%    Columns = extract_chunk(Chunk),
-%%     lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
-
-%% @doc Extract a query result of the first data chunk.
--spec extract_result(QueryResult) -> Chunks
-    when QueryResult :: result(),
-         Chunks :: [ named_column() ]. 
-extract_result(QueryResult) ->
-    extract_result1(QueryResult, chunk_count(QueryResult)).
-
-extract_result1(_Result, 0) -> [];
-extract_result1(Result, N) when N > 0 ->
-    Chunk = get_chunk(Result, 0),
-    Names = column_names(Result),
-    Columns = extract_chunk(Chunk),
-    lists:zipwith(fun(Column, Name) ->
-                          Column#{ name => Name }
-                  end,
-                  Columns, Names).
-
 result_extract(Result) ->
     case fetch_chunk(Result) of
         '$end' ->
@@ -804,9 +754,7 @@ chunk_rows(Chunk, Result, Rows) ->
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
-            % extract_result(Resuet);
             result_extract(Result);
-            % ok;
         {error, _}=E ->
             E
     end.
@@ -819,7 +767,7 @@ squery(Connection, Sql) ->
 execute(Stmt) ->
     case execute_prepared(Stmt) of
         {ok, Result} ->
-            extract_result(Result);
+            result_extract(Result);
         {error, _}=E ->
             E
     end.
