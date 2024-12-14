@@ -930,8 +930,8 @@ extract_test() ->
     {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
     C2 = educkdb:get_chunk(R2, 0),
     ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
-    ?assertEqual( [], educkdb:chunk_column_types(C2)),
-    ?assertEqual( [], educkdb:chunk_columns(C2)),
+    ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
+    ?assertEqual( [ [3] ], educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:get_chunk(R3, 0),
@@ -968,15 +968,8 @@ boolean_extract_test() ->
     0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (null, true), (false, null), (true, true), (false, false), (true, false);"),
-    ?assertEqual(
-       [ #{ name => <<"Count">>,
-                 type => bigint,
-                 data => [5] }
-       ],
-       educkdb:extract_result(R2)),
-
-    ?assertEqual( #{ types => [bigint], names => [<<"Count">>], columns => [ [ [ 5 ] ] ] },
-                  educkdb:result_extract(R2)),
+    Expected2 = {ok,[{column,<<"Count">>,bigint}],[{5}]},
+    ?assertEqual(Expected2, educkdb:result_extract(R2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     ?assertEqual(
