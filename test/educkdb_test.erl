@@ -526,10 +526,10 @@ appender_append_int64_test() ->
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
  
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => bigint, data => [?INT64_MIN, 1, 3]},
-              #{ name => <<"b">>, type => bigint, data => [?INT64_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = bigint},
+                    #column{ name = <<"b">>, type = bigint}],
+                [{?INT64_MIN, ?INT64_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
