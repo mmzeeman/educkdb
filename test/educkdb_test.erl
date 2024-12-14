@@ -766,12 +766,9 @@ appender_append_time_test() ->
 
     ok = educkdb:appender_flush(Appender),
 
-    ?assertEqual({ok,[#{ name => <<"a">>, type => time,
-                         data => [{ 0,  0,  0.0},
-                                  {10, 10, 10.0},
-                                  {23, 50, 55.123456}
-                                 ]} ]},
-                 educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = time}],
+                [{{0,0,0.0}},{{10,10,10.0}},{{23,50,55.123456}}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
