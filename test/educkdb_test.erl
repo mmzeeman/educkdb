@@ -471,11 +471,9 @@ bind_varchar_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => varchar, data => [<<"hello">>, <<"😀"/utf8>>] },
-              #{ name => <<"b">>, type => varchar, data => [ <<"world">>, <<"1234567890">>] }
-            ]},
-       educkdb:squery(Conn, "select * from test order by a")),
+    Expected = {ok,[ #column{ name = <<"a">>, type = varchar},#column{ name = <<"b">>, type = varchar}],
+                [{<<"hello">>,<<"world">>}, {<<240,159,152,128>>,<<"1234567890">>}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
