@@ -1296,9 +1296,8 @@ map_test() ->
     %%             },
     %%             educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
 
-    ?assertMatch({ok, [#{ data := [ { no_extract, map }] }] },
-                 educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']);")),
-
+    ?assertMatch({ok, [#column{ name = <<"a">>, type = map}], [{{no_extract,map}}]},
+                 educkdb:squery(Conn, "SELECT map([1, 5, 2, 12], ['a', 'e', 'b', 'c']) as a;")),
 
     ok.
 
