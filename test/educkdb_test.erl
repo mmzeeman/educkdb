@@ -742,10 +742,10 @@ appender_append_boolean_test() ->
     ok = educkdb:appender_end_row(Appender),
 
     ok = educkdb:appender_flush(Appender),
- 
-    ?assertEqual({ok,[ #{ name => <<"a">>, type => boolean, data => [false, true, true]},
-                       #{ name => <<"b">>, type => boolean, data => [false, false, true]} ]},
-                 educkdb:squery(Conn, "select * from test order by a;")),
+    
+    Expected = {ok,[#column{ name = <<"a">>, type = boolean},#column{ name = <<"b">>, type = boolean}],
+                [{false,false},{true,false},{true,true}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
