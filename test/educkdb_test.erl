@@ -848,10 +848,10 @@ yielding_test() ->
     educkdb:appender_flush(Appender),
     {ok, _, _} = educkdb:squery(Conn, "commit;"),
 
-    ?assertEqual({ok, [#{ name => <<"count">>, type => bigint, data => [length(Values)] }]}, educkdb:squery(Conn, "select count(*) as count from test;")),
+    Expected = {ok, [#column{ name = <<"count">>, type = bigint}], [ {length(Values)}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select count(*) as count from test;")),
 
     {ok, Res} = educkdb:query(Conn, "select a from test order by a;"),
-
     Chunks = [ begin
                    [Col] = educkdb:extract_chunk(C),
                    maps:get(data, Col)
