@@ -1154,9 +1154,10 @@ uuid_test() ->
     {ok, _, _} = educkdb:squery(Conn, "insert into test values('550e8400-e29b-41d4-a716-446655440000')"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values('ffffffff-ffff-ffff-ffff-ffffffffffff')"),
 
-    {ok, [#{ data := DuckBinUUIDs }]} = educkdb:squery(Conn, "select * from test order by a"),
+    {ok, _ , DuckBinUUIDs} = educkdb:squery(Conn, "select * from test order by a"),
 
-    ?assertEqual([ educkdb:uuid_string_to_uuid_binary(D) || D <- [UUID1, UUID2, UUID3]], DuckBinUUIDs),
+    ?assertEqual([ { educkdb:uuid_string_to_uuid_binary(D) } || D  <- [UUID1, UUID2, UUID3]],
+                 DuckBinUUIDs),
 
     ok.
 
