@@ -552,11 +552,11 @@ appender_append_int32_test() ->
     ok = educkdb:append_int32(Appender, ?INT32_MAX),
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
- 
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => integer, data => [?INT32_MIN, 1, 3]},
-              #{ name => <<"b">>, type => integer, data => [?INT32_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+
+    Expected = {ok,[#column{ name = <<"a">>, type = integer},
+                    #column{ name = <<"b">>, type = integer}],
+                [{?INT32_MIN, ?INT32_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
@@ -580,17 +580,17 @@ appender_append_int16_test() ->
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
  
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => smallint, data => [?INT16_MIN, 1, 3]},
-              #{ name => <<"b">>, type => smallint, data => [?INT16_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = smallint},
+                    #column{ name = <<"b">>, type = smallint}],
+                [{?INT16_MIN, ?INT16_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
 appender_append_int8_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a tinyint, b tinyint);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a tinyint, b tinyint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -607,10 +607,10 @@ appender_append_int8_test() ->
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
 
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => tinyint, data => [?INT8_MIN, 1, 3]},
-              #{ name => <<"b">>, type => tinyint, data => [?INT8_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = tinyint},
+                    #column{ name = <<"b">>, type = tinyint}],
+                [{?INT8_MIN, ?INT8_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
