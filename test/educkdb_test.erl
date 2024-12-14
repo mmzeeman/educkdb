@@ -617,7 +617,7 @@ appender_append_int8_test() ->
 appender_append_uint64_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a ubigint, b ubigint);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a ubigint, b ubigint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -633,18 +633,18 @@ appender_append_uint64_test() ->
     ok = educkdb:append_uint64(Appender, ?UINT64_MAX),
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
- 
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => ubigint, data => [0, 1, 3]},
-              #{ name => <<"b">>, type => ubigint, data => [?UINT64_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+
+    Expected = {ok,[#column{ name = <<"a">>, type = ubigint},
+                    #column{ name = <<"b">>, type = ubigint}],
+                [{0, ?UINT64_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
 appender_append_uint32_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a uinteger, b uinteger);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a uinteger, b uinteger);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -661,17 +661,17 @@ appender_append_uint32_test() ->
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
  
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => uinteger, data => [0, 1, 3]},
-              #{ name => <<"b">>, type => uinteger, data => [?UINT32_MAX, 2, 4]} ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = uinteger},
+                    #column{ name = <<"b">>, type = uinteger}],
+                [{0, ?UINT32_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
 appender_append_uint16_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a usmallint, b usmallint);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a usmallint, b usmallint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -687,19 +687,18 @@ appender_append_uint16_test() ->
     ok = educkdb:append_uint16(Appender, ?UINT16_MAX),
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
- 
-    ?assertEqual(
-       {ok,[ #{ name => <<"a">>, type => usmallint, data => [0, 1, 3]},
-             #{ name => <<"b">>, type => usmallint, data => [?UINT16_MAX, 2, 4]}
-           ]},
-       educkdb:squery(Conn, "select * from test order by a;")),
+
+    Expected = {ok,[#column{ name = <<"a">>, type = usmallint},
+                    #column{ name = <<"b">>, type = usmallint}],
+                [{0, ?UINT16_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
 appender_append_uint8_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    {ok, _} = educkdb:squery(Conn, "create table test(a utinyint, b utinyint);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a utinyint, b utinyint);"),
 
     {ok, Appender} = educkdb:appender_create(Conn, undefined, <<"test">>),
 
@@ -715,12 +714,11 @@ appender_append_uint8_test() ->
     ok = educkdb:append_uint8(Appender, ?UINT8_MAX),
     ok = educkdb:appender_end_row(Appender),
     ok = educkdb:appender_flush(Appender),
- 
-    ?assertEqual({ok,[
-                      #{ name => <<"a">>, type => utinyint, data => [0, 1, 3] },
-                      #{ name => <<"b">>, type => utinyint, data => [?UINT8_MAX, 2, 4] }
-                     ]},
-                 educkdb:squery(Conn, "select * from test order by a;")),
+
+    Expected = {ok,[#column{ name = <<"a">>, type = utinyint},
+                    #column{ name = <<"b">>, type = utinyint}],
+                [{0, ?UINT8_MAX},{1,2},{3,4}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
