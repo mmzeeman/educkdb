@@ -420,7 +420,7 @@ bind_null_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, _, _} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
+    {ok, [], []} = educkdb:squery(Conn, "create table test(a REAL, b DOUBLE);"),
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1, $2);"),
 
     ok = educkdb:bind_null(Insert,  1),
@@ -428,8 +428,10 @@ bind_null_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, [ #{ data := [null] },
-           #{ data := [null]} ]} = educkdb:squery(Conn, "select * from test order by a"),
+    ?assertEqual({ok, [#column{ name = <<"a">>, type = float},
+                       #column{ name = <<"b">>, type = double }],
+                  [{null, null}]},
+                 educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
