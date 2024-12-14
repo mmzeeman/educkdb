@@ -1197,9 +1197,11 @@ enum_test() ->
 
     {ok, _, _} = educkdb:squery(Conn, "CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');"),
 
-    {ok, [#{ data := [ <<"orange">> ], type := enum }]} = educkdb:squery(Conn, "select 'orange'::rainbow"),
+    Expected1 = {ok,[#column{ name = <<"CAST('orange' AS rainbow)">>, type = enum}], [{<<"orange">>}]},
+    ?assertEqual(Expected1, educkdb:squery(Conn, "select 'orange'::rainbow")),
 
-    ?assertEqual({ok, [#{ data => [ <<"red">>, null, <<"orange">>, <<"yellow">>, <<"green">> ], name => <<"b">>, type => enum }]},
+    Expected2 = {ok,[#column{ name = <<"b">>, type = enum}], [{<<"red">>}, {null}, {<<"orange">>}, {<<"yellow">>}, {<<"green">>}]},
+    ?assertEqual(Expected2, 
                  educkdb:squery(Conn, "select a::rainbow as b from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow)) color(a) ")),
 
     ok.
