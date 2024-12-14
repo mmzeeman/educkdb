@@ -1225,24 +1225,24 @@ list_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     %% Simple lists
-    ?assertMatch({ok, [#{ data := [ [1,2,3,4] ]}]},
-                 educkdb:squery(Conn, "SELECT [1, 2, 3, 4];")),
-    ?assertMatch({ok, [#{ data := [ [1,2, null, 4] ]}]},
-                 educkdb:squery(Conn, "SELECT [1, 2, null, 4];")),
-    ?assertMatch({ok, [#{ data := [ [<<"one">>, <<"two">>, null, <<"three">>] ]}]},
-                 educkdb:squery(Conn, "SELECT ['one', 'two', null, 'three'];")),
+    ?assertMatch({ok, [#column{ name = <<"a">>, type = list}], [{[1,2,3,4]}]},
+                 educkdb:squery(Conn, "SELECT [1, 2, 3, 4] as a;")),
+    ?assertMatch({ok, [#column{ name = <<"a">>, type = list}], [{[1,2,null,4]}]},
+                 educkdb:squery(Conn, "SELECT [1, 2, null, 4] as a;")),
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[<<"one">>, <<"two">>, null, <<"three">>]}]},
+                 educkdb:squery(Conn, "SELECT ['one', 'two', null, 'three'] as a;")),
 
     %% Nested lists
-    ?assertMatch({ok, [#{ data := [ [ [10, 20], [1,2,3, 4], [1] ] ]}]},
-                 educkdb:squery(Conn, "SELECT [ [10, 20], [1,2,3,4], [1] ];")),
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[10,20],[1,2,3,4],[1]]}]},
+                 educkdb:squery(Conn, "SELECT [ [10, 20], [1,2,3,4], [1] ] as a;")),
 
     %% With null values
-    ?assertMatch({ok, [#{ data := [ [ [10, 20], null, [1] ] ]}]},
-                 educkdb:squery(Conn, "SELECT [ [10, 20], null, [1] ];")),
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[10,20],null,[1]]}]},
+                 educkdb:squery(Conn, "SELECT [ [10, 20], null, [1] ] as a;")),
 
     %% With null values
-    ?assertMatch({ok, [#{ data := [ [ [[10, 20]], [null], [[1]] ] ]}]},
-                 educkdb:squery(Conn, "SELECT [ [ [10, 20] ], [null], [[1]] ];")),
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[[10,20]],[null],[[1]]]}]},
+                 educkdb:squery(Conn, "SELECT [ [ [10, 20] ], [null], [[1]] ] as a;")),
 
     ok.
 
