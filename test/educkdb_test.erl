@@ -1118,12 +1118,13 @@ hugeint_test() ->
     ?assertEqual({hugeint, 0, 1}, E), 
     ?assertEqual({hugeint, 0, 1111}, F), 
 
+    Expected1 = {ok,[#column{ name = <<"-(CAST(170141183460469231731687303715884105727 AS HUGEINT))">>,
+                              type = hugeint}],
+                 [{{hugeint,-9223372036854775808,1}}]},
+    ?assertMatch(Expected1, educkdb:squery(Conn, "SELECT -170141183460469231731687303715884105727::hugeint")),
 
-    ?assertMatch({ok, [ #{data := [{hugeint, -9223372036854775808, 1}] } ]},
-                 educkdb:squery(Conn, "SELECT -170141183460469231731687303715884105727::hugeint")),
-
-    ?assertMatch({ok, [ #{data := [{hugeint, -9223372036854775808, 1}] } ]},
-                 educkdb:squery(Conn, "SELECT * FROM (values (-170141183460469231731687303715884105727::hugeint))")),
+    Expected2 = {ok,[#column{ name = <<"col0">>, type = hugeint}], [{{hugeint,-9223372036854775808,1}}]},
+    ?assertMatch(Expected2, educkdb:squery(Conn, "SELECT * FROM (values (-170141183460469231731687303715884105727::hugeint))")),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values(-170141183460469231731687303715884105727::hugeint)"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values(-1111::hugeint)"),
@@ -1132,8 +1133,8 @@ hugeint_test() ->
     {ok, _, _} = educkdb:squery(Conn, "insert into test values(1::hugeint)"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values(1111::hugeint)"),
 
-    {ok, [ #{ data := [ A, B, C, D, E, F ] }
-         ]} = educkdb:squery(Conn, "select * from test order by a"),
+    Expected3 = {ok, [{column,<<"a">>,hugeint}], [ { A }, { B }, { C }, { D }, { E }, { F } ]},
+    ?assertMatch(Expected3, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
