@@ -789,11 +789,9 @@ appender_append_date_test() ->
 
     ok = educkdb:appender_flush(Appender),
 
-    ?assertEqual({ok,[ #{name => <<"a">>, type => date,
-                         data => [ {   0, 1, 1},
-                                   {1901,10,10},
-                                   {2032, 4,29} ]} ]},
-                 educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = date}],
+                [{{0,1,1}},{{1901,10,10}},{{2032,4,29}}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
