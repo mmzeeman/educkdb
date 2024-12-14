@@ -815,15 +815,12 @@ appender_append_timestamp_test() ->
 
     ok = educkdb:appender_flush(Appender),
 
-    ?assertEqual({ok,[ #{ name => <<"a">>, type => timestamp,
-                          data => [
-                                   {{   0,  1,  1}, { 0,  0,  0.0}},
-                                   {{1901, 10, 10}, {10, 15,  0.0}},
-                                   {{2022, 3, 19}, {22, 36, 23.983105}},
-                                   {{2032,  4, 29}, {23, 59, 59.0}}
-                                  ]}
-                     ]},
-                 educkdb:squery(Conn, "select * from test order by a;")),
+    Expected = {ok,[#column{ name = <<"a">>, type = timestamp}],
+                [{{{0,1,1},{0,0,0.0}}},
+                 {{{1901,10,10},{10,15,0.0}}},
+                 {{{2022,3,19},{22,36,23.983105}}},
+                 {{{2032,4,29},{23,59,59.0}}}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
 
