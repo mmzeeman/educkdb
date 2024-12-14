@@ -446,8 +446,11 @@ bind_boolean_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    {ok, [ #{ data := [true] },
-           #{ data := [false] } ]} = educkdb:squery(Conn, "select * from test order by a"),
+    Expected = {ok, [ #column{ name = <<"a">>, type = boolean},
+                      #column{ name = <<"b">>, type = boolean}],
+                [{true,false}]},
+
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
     
