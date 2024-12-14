@@ -1167,18 +1167,20 @@ blob_test() ->
 
     {ok, _, _} = educkdb:squery(Conn, "create table test(a blob);"),
 
-    {ok, [#{ data := [ <<>> ] }]} = educkdb:squery(Conn, "select ''::blob"),
-    {ok, [#{ data := [ <<"1234">> ] }]} = educkdb:squery(Conn, "select '1234'::blob"),
-    {ok, [#{ data := [ <<"abcdefghijklmnopqrstuvwxyz">> ] }]} = educkdb:squery(Conn, "select 'abcdefghijklmnopqrstuvwxyz'::blob"),
+    {ok, [#column{ name = <<"''::BLOB">>, type = blob}], [ {<<>>} ] } = educkdb:squery(Conn, "select ''::blob"),
+    {ok, [#column{ name = <<"'1234'::BLOB">>, type = blob}], [ {<<"1234">>} ] } = educkdb:squery(Conn, "select '1234'::blob"),
+    {ok, [#column{ name = <<"'abcdefghijklmnopqrstuvwxyz'::BLOB">>, type = blob}], [ {<<"abcdefghijklmnopqrstuvwxyz">>} ] }
+        = educkdb:squery(Conn, "select 'abcdefghijklmnopqrstuvwxyz'::blob"),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values('00'::blob)"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values(''::blob)"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values('1234'::blob)"),
 
-    ?assertMatch({ok, [#{ data := [0, 2, 4] }]}, educkdb:squery(Conn, "select octet_length(a) from test order by a;")),
-    {ok, [#{ data := Blobs }]} = educkdb:squery(Conn, "select * from test order by a;"),
+    ?assertMatch({ok,[#column{ name = <<"octet_length(a)">>, type = bigint}],[{0},{2},{4}]},
+                  educkdb:squery(Conn, "select octet_length(a) from test order by a;")),
+    {ok, _,  Blobs} = educkdb:squery(Conn, "select * from test order by a;"),
 
-    ?assertEqual([<<>>, <<"00">>, <<"1234">>], Blobs),
+    ?assertEqual([ { <<>> }, { <<"00">> }, { <<"1234">> }], Blobs),
 
     ok.
 
