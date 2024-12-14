@@ -868,11 +868,9 @@ current_schema_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     %% FYI, the result must be unnested first.
-    ?assertEqual( {ok,[ #{ name => <<"current_schemas">>,
-                           type => varchar, 
-                           data => [<<"main">>, <<"main">>, <<"main">>, <<"pg_catalog">>] }
-                      ]},
-                   educkdb:squery(Conn, "SELECT UNNEST(current_schemas(true)) as current_schemas;")),
+    Expected = {ok,[#column{ name = <<"current_schemas">>, type = varchar}],
+                [{<<"main">>}, {<<"main">>}, {<<"main">>}, {<<"pg_catalog">>}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "SELECT UNNEST(current_schemas(true)) as current_schemas;")),
     ok.
 
 
