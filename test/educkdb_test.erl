@@ -1267,22 +1267,20 @@ struct_table_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, _, _} = educkdb:squery(Conn, "create table test(a row(i integer, j integer));"),
-    ?assertMatch({ok, [], []}, educkdb:squery(Conn, "SELECT * from test;")),
+    ?assertEqual({ok, [], []}, educkdb:squery(Conn, "SELECT * from test;")),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values (null);"),
-    ?assertMatch({ok, [#{ data := [null],
-                          name := <<"a">>,
-                          type := struct }]},
+    ?assertEqual({ok, [#column{ name = <<"a">>, type = struct}],[{null}]}, 
                  educkdb:squery(Conn, "SELECT * from test;")),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values ({i: 10, j: 20});"),
     {ok, _, _} = educkdb:squery(Conn, "insert into test values ({i: 123, j: 456});"),
 
-    ?assertMatch({ok, [#{ data := [#{<<"i">> := 10, <<"j">> := 20}, #{ <<"i">> := 123, <<"j">> := 456}, null],
-                          name := <<"a">>,
-                          type := struct }]},
+    ?assertEqual({ok,[#column{ name = <<"a">>, type = struct}],
+                     [{#{<<"i">> => 10, <<"j">> => 20}},
+                      {#{<<"i">> => 123, <<"j">> => 456}},
+                      {null}]},
                  educkdb:squery(Conn, "SELECT * from test order by a.i;")),
-
 
     ok.
 
