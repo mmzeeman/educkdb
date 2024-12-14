@@ -352,13 +352,12 @@ bind_date_and_time_test() ->
 
     {ok, [ #{ data := [1] } ]} = x(Insert),
 
-    ?assertEqual(
-       {ok, [ #{ name => <<"a">>, type => date,
-                 data => [{1970,  1,  1}, {1970,  8, 11}, {2022, 12, 25}] },
-              #{ name => <<"b">>, type => time,
-                 data => [ { 0,  0, 0.0}, { 0,  0, 1.0}, { 8, 12, 10.1234}] }
-            ]
-       }, educkdb:squery(Conn, "select * from test order by a")),
+    Expected = {ok, [ #column{ name = <<"a">>, type = date},
+                      #column{ name = <<"b">>, type = time}],
+                [{{1970,1,1},{0,0,0.0}},
+                 {{1970,8,11},{0,0,1.0}},
+                 {{2022,12,25},{8,12,10.1234}}]},
+    ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
 
