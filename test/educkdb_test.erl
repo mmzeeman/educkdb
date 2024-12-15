@@ -963,15 +963,11 @@ boolean_extract_test() ->
     ?assertEqual(Expected2, educkdb:result_extract(R2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
-    ?assertEqual(
-       [ #{ name => <<"a">>, 
-            type => boolean,
-            data => [false, false, true, true, null] },
-         #{ name => <<"b">>,
-            type => boolean,
-            data => [null, false, true, false, true] }
-       ],
-       educkdb:extract_result(R3)),
+
+    Result = {ok,[#column{ name = <<"a">>, type = boolean},
+                  #column{ name = <<"b">>, type = boolean}],
+                     [{false, null}, {false, false}, {true, true}, {true, false}, {null, true}]},
+    ?assertEqual(Result, educkdb:result_extract(R3)),
 
     ok.
 
