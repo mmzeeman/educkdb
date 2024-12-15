@@ -890,14 +890,13 @@ garbage_collect_test() ->
                 {ok, Res3} = educkdb:query(Conn, "insert into test values(20, '20');"),
                 {ok, Res4} = educkdb:query(Conn, "select * from test;"),
 
-                ?assertEqual([], educkdb:extract_result(Res1)),
-                ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
-                             educkdb:extract_result(Res2)),
-                ?assertEqual([#{ name => <<"Count">>, type => bigint, data => [1]}],
-                             educkdb:extract_result(Res3)),
-                ?assertEqual([#{ name => <<"id">>, type => integer, data => [10, 20]},
-                              #{ name => <<"x">>, type => varchar, data => [<<"10">>, <<"20">>]}],
-                             educkdb:extract_result(Res4)),
+                ?assertEqual({ok, [], []}, educkdb:result_extract(Res1)),
+
+                ?assertEqual({ok, [#column{ name = <<"Count">>, type = bigint}], [ {1} ]}, educkdb:result_extract(Res2)),
+                ?assertEqual({ok, [#column{ name = <<"Count">>, type = bigint}], [ {1} ]}, educkdb:result_extract(Res3)),
+                ?assertEqual({ok ,[#column{ name = <<"id">>, type = integer},
+                                   #column{ name = <<"x">>, type = varchar}],
+                              [{10,<<"10">>},{20,<<"20">>}]}, educkdb:result_extract(Res4)),
 
                 ok = educkdb:disconnect(Conn),
                 ok = educkdb:close(Db)
@@ -1043,15 +1042,15 @@ varchar_extract_test() ->
 
     {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
     C2 = educkdb:get_chunk(R2, 0),
-    ?assertEqual( [ #{ type => bigint, data => [4] } ], educkdb:extract_chunk(C2)),
+
+    ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
+    ?assertEqual( [ [4] ], educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:get_chunk(R3, 0),
-    ?assertEqual(
-       [ #{ type => varchar, data => [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ] },
-              #{ type => varchar, data => [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] }
-       ],
-       educkdb:extract_chunk(C3)),
+
+    ?assertEqual( [ varchar, varchar ], educkdb:chunk_column_types(C3)),
+    ?assertEqual( [ [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ], [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] ], educkdb:chunk_columns(C3)),
 
     ok.
 
