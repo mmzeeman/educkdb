@@ -863,8 +863,7 @@ yielding_test() ->
 
     {ok, Res} = educkdb:query(Conn, "select a from test order by a;"),
     Chunks = [ begin
-                   [Col] = educkdb:extract_chunk(C),
-                   maps:get(data, Col)
+                   Col = educkdb:chunk_columns(C)
                end || C <- educkdb:get_chunks(Res) ],
 
     Col = lists:flatten(Chunks),
