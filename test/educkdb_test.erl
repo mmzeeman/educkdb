@@ -278,21 +278,22 @@ bind_unsigned_int_test() ->
     ok = educkdb:bind_uint32(Insert, 3, 0),
     ok = educkdb:bind_uint64(Insert, 4, 0),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     ok = educkdb:bind_uint8(Insert,  1,  ?INT8_MAX),
     ok = educkdb:bind_uint16(Insert, 2, ?INT16_MAX),
     ok = educkdb:bind_uint32(Insert, 3, ?INT32_MAX),
     ok = educkdb:bind_uint64(Insert, 4, ?INT64_MAX),
     
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ok = educkdb:bind_uint8(Insert,  1,  ?UINT8_MAX),
     ok = educkdb:bind_uint16(Insert, 2, ?UINT16_MAX),
     ok = educkdb:bind_uint32(Insert, 3, ?UINT32_MAX),
     ok = educkdb:bind_uint64(Insert, 4, ?UINT64_MAX),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ?assertEqual({ok, [#column{ name = <<"a">>, type = utinyint},
                        #column{ name = <<"b">>, type = usmallint},
