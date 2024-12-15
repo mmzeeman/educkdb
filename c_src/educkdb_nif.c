@@ -1195,23 +1195,6 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
  */
 
 static ERL_NIF_TERM
-educkdb_chunk_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
-    idx_t count;
-
-    if(argc != 1) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
-        return enif_make_badarg(env);
-    }
-
-    count = duckdb_result_chunk_count(res->result);
-    return enif_make_uint64(env, count);
-}
-
-static ERL_NIF_TERM
 educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
 
@@ -2576,7 +2559,6 @@ static ErlNifFunc nif_funcs[] = {
     {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Result
-    {"chunk_count", 1, educkdb_chunk_count}, /* deprecated */
     {"column_names", 1, educkdb_column_names},
     {"fetch_chunk", 1, educkdb_fetch_chunk},
     {"get_chunks", 1, educkdb_get_chunks},

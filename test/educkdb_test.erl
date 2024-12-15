@@ -148,27 +148,11 @@ column_names_test() ->
 
     ok.
 
-chunk_count_test() ->
-    {ok, Db} = educkdb:open(":memory:"),
-    {ok, Conn} = educkdb:connect(Db),
-
-    {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
-    0 = educkdb:chunk_count(Res),
-
-    {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
-    1 = educkdb:chunk_count(Res1),
-
-    {ok, Res2} = educkdb:query(Conn, "select * from test;"),
-    1 = educkdb:chunk_count(Res2),
-
-    ok.
-
 chunk_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
-    0 = educkdb:chunk_count(Res),
 
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     [Chunk1] = educkdb:get_chunks(Res1),
@@ -955,7 +939,6 @@ boolean_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a boolean, b boolean);"),
-    0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (null, true), (false, null), (true, true), (false, false), (true, false);"),
     Expected2 = {ok,[{column,<<"Count">>,bigint}],[{5}]},
@@ -975,7 +958,6 @@ signed_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a smallint, b tinyint, c integer, d bigint);"),
-    0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (-10, -10, -10, -10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -996,7 +978,6 @@ unsigned_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a usmallint, b utinyint, c uinteger, d ubigint);"),
-    0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10, 10, 10, 10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -1017,7 +998,6 @@ float_and_double_extract2_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a float, b double);"),
-    0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (1.0, 10.1), (2.0, 11.1), (3.0, 12.2);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -1038,7 +1018,6 @@ varchar_extract_test() ->
     {ok, Conn} = educkdb:connect(Db),
 
     {ok, R1} = educkdb:query(Conn, "create table test(a varchar, b varchar);"),
-    0 = educkdb:chunk_count(R1),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
     C2 = educkdb:fetch_chunk(R2),
