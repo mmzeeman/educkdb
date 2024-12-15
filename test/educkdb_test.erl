@@ -316,12 +316,13 @@ bind_float_and_double_test() ->
     ok = educkdb:bind_float(Insert, 1, 0.0),
     ok = educkdb:bind_double(Insert, 2, 0.0),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     ok = educkdb:bind_float(Insert, 1,  200000000000000000000000.0),
     ok = educkdb:bind_double(Insert, 2, 200000000000000000000000.0),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ?assertEqual(
        {ok, [#column{ name = <<"a">>, type = float},
