@@ -344,17 +344,18 @@ bind_date_and_time_test() ->
     ok = educkdb:bind_date(Insert, 1,  {1970, 8, 11}),
     ok = educkdb:bind_time(Insert, 2,  1000000), %% raw, in microseconds
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     ok = educkdb:bind_date(Insert, 1,  {1970, 1, 1}),
     ok = educkdb:bind_time(Insert, 2,  0),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ok = educkdb:bind_date(Insert, 1,  {2022, 12, 25}),
     ok = educkdb:bind_time(Insert, 2,  {8, 12, 10.1234}),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     Expected = {ok, [ #column{ name = <<"a">>, type = date},
                       #column{ name = <<"b">>, type = time}],
