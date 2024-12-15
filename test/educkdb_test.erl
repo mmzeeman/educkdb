@@ -202,9 +202,7 @@ prepare_test() ->
     {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
     Query = "select * from test;",
     {ok, P} = educkdb:prepare(Conn, Query),
-
-    {ok, []} = x(P),
-
+    {ok, [], []} = x(P),
     educkdb:disconnect(Conn),
     educkdb:close(Db),
 
@@ -1320,9 +1318,7 @@ map_test() ->
 
 x(Stmt) ->
     case educkdb:execute_prepared(Stmt) of
-        {ok, Result} ->
-            {ok, educkdb:extract_result(Result)};
-        {error, _}=E ->
-            E
+        {ok, Result} -> educkdb:result_extract(Result);
+        {error, _}=E -> E
     end.
 
