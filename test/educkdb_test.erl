@@ -862,10 +862,7 @@ yielding_test() ->
     ?assertEqual(Expected, educkdb:squery(Conn, "select count(*) as count from test;")),
 
     {ok, Res} = educkdb:query(Conn, "select a from test order by a;"),
-    Chunks = [ begin
-                   Col = educkdb:chunk_columns(C)
-               end || C <- educkdb:get_chunks(Res) ],
-
+    Chunks = [ educkdb:chunk_columns(C) || C <- educkdb:get_chunks(Res) ],
     Col = lists:flatten(Chunks),
     ?assertEqual(length(Values), length(Col)),
     Values = Col,
