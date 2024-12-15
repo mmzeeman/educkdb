@@ -1,10 +1,10 @@
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022-2023 Maas-Maarten Zeeman
+%% @copyright 2022-2024 Maas-Maarten Zeeman
 %%
 %% @doc Low level erlang API for duckdb databases.
 %% @end
 
-%% Copyright 2022-2023 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% Copyright 2022-2024 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -53,16 +53,16 @@
     bind_null/2,
 
     %% Results
-    extract_result/1,
-    get_chunk/2,
+    result_extract/1,
+    fetch_chunk/1,
     get_chunks/1,
-    chunk_count/1,
     column_names/1,
 
     %% Chunks
-    extract_chunk/1,
-    get_chunk_column_count/1,
-    get_chunk_size/1,
+    chunk_column_count/1,
+    chunk_column_types/1,
+    chunk_columns/1,
+    chunk_size/1,
 
     appender_create/3,
     append_boolean/2,
@@ -156,7 +156,6 @@
                    | list | struct | map
                    | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
 
--type column() :: #{ data := list(data()), type := type_name() }.
 -type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
 
 -type bind_response() :: ok | {error, _}.
@@ -461,20 +460,13 @@ bind_null(_Stmt, _Index) ->
          DataChunks :: list(data_chunk()).
 get_chunks(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get a data chunk from a query result.
- -spec get_chunk(QueryResult, Idx) -> DataChunk 
+ 
+%% @doc Fetches a data chunk from a result. The function should be called
+%% repeatedly until the result is exhausted.
+-spec fetch_chunk(QueryResult) -> DataChunk | '$end'
     when QueryResult :: result(),
-         Idx :: non_neg_integer(),
          DataChunk :: data_chunk().
-get_chunk(_Result, _ChunkIndex) -> 
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get the number of data chunks in a query result.
--spec chunk_count(QueryResult) -> Count
-    when QueryResult :: result(),
-         Count :: uint64().
-chunk_count(_Result) -> 
+fetch_chunk(_Result) -> 
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Get the column names from the query result.
@@ -488,27 +480,30 @@ column_names(_Result) ->
 %% Chunks
 %%
 
-%% @doc Extract the data from a data chunk. Chunks contain multiple columns and
-%%      rows. All data in the chunks is extracted.
--spec extract_chunk(DataChunk) -> Columns
-    when DataChunk :: data_chunk(),
-         Columns :: list(column()).
-extract_chunk(_Chunk) ->
-    erlang:nif_error(nif_library_not_loaded).
-
 %% @doc Return the number of columns in the data chunk.
--spec get_chunk_column_count(DataChunk) -> ColumnCount
+-spec chunk_column_count(DataChunk) -> ColumnCount
     when DataChunk :: data_chunk(),
          ColumnCount :: uint64().
-get_chunk_column_count(_Chunk) ->
+chunk_column_count(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Get the column types of the chunk
+%% [todo] spec..
+chunk_column_types(_Chunk) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Get the columns data of the chunk
+%% [todo] spec
+chunk_columns(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the number of tuples in th data chunk.
--spec get_chunk_size(DataChunk) -> TupleCount
+-spec chunk_size(DataChunk) -> TupleCount
     when DataChunk :: data_chunk(),
          TupleCount :: uint64().
-get_chunk_size(_Chunk) ->
+chunk_size(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
+
 
 %%
 %% Appender Interface
@@ -700,19 +695,38 @@ appender_flush(_Appender) ->
 %% Higher Level API
 %%
 
-%% @doc Extract a query result of the first data chunk.
--spec extract_result(QueryResult) -> Chunks
-    when QueryResult :: result(),
-         Chunks :: [ named_column() ]. 
-extract_result(QueryResult) ->
-    extract_result1(QueryResult, chunk_count(QueryResult)).
+result_extract(Result) ->
+    case fetch_chunk(Result) of
+        '$end' ->
+            {ok, [], []};
+        Chunk ->
+            Names = column_names(Result),
+            Types = chunk_column_types(Chunk),
+            Info = column_info(Names, Types),
+            Rows = chunk_rows(Chunk, Result, []),
+            {ok, Info, Rows}
+    end.
 
-extract_result1(_Result, 0) -> [];
-extract_result1(Result, N) when N > 0 ->
-    Chunk = get_chunk(Result, 0),
-    Names = column_names(Result),
-    Columns = extract_chunk(Chunk),
-    lists:zipwith(fun(Column, Name) -> Column#{ name => Name } end, Columns, Names).
+column_info(Names, Types) ->
+    column_info(Names, Types, []).
+
+column_info([], _, Acc) ->
+    lists:reverse(Acc);
+column_info([N|T], undefined, Acc) ->
+    column_info(T, undefined, [#column{name=N}|Acc]);
+column_info([Name|RestNames], [Type|RestTypes], Acc) ->
+    column_info(RestNames, RestTypes, [#column{name=Name, type=Type}|Acc]).
+
+chunk_rows('$end', _Result, Rows) ->
+    lists:reverse(lists:flatten(Rows));
+chunk_rows(Chunk, Result, Rows) ->
+    R = lists:reverse(
+          lists:map(fun list_to_tuple/1,
+                    transpose(
+                      chunk_columns(Chunk)))),
+
+    chunk_rows(fetch_chunk(Result), Result, [R | Rows]).
+
 
 %% @doc Do a simple sql query without parameters, and retrieve the result from the
 %%      first data chunk.
@@ -723,7 +737,7 @@ extract_result1(Result, N) when N > 0 ->
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
-            {ok, extract_result(Result)};
+            result_extract(Result);
         {error, _}=E ->
             E
     end.
@@ -734,15 +748,20 @@ squery(Connection, Sql) ->
     when PreparedStatement :: prepared_statement(),
          Result :: {ok, [ named_column() ]} | {error, _}.
 execute(Stmt) ->
-    case educkdb:execute_prepared(Stmt) of
+    case execute_prepared(Stmt) of
         {ok, Result} ->
-            educkdb:extract_result(Result);
-        {error, _}=E ->E
+            result_extract(Result);
+        {error, _}=E ->
+            E
     end.
 
 %%
 %% Utilities
 %% 
+
+transpose([[]|_]) -> [];
+transpose(M) ->
+    [ lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
 
 %% @doc Convert a duckdb hugeint record to erlang integer. 
 -spec hugeint_to_integer(Hugeint) -> Integer
