@@ -432,7 +432,8 @@ bind_null_test() ->
     ok = educkdb:bind_null(Insert,  1),
     ok = educkdb:bind_null(Insert,  2),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     ?assertEqual({ok, [#column{ name = <<"a">>, type = float},
                        #column{ name = <<"b">>, type = double }],
@@ -451,7 +452,8 @@ bind_boolean_test() ->
     ok = educkdb:bind_boolean(Insert, 1, true),
     ok = educkdb:bind_boolean(Insert, 2, false),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     Expected = {ok, [ #column{ name = <<"a">>, type = boolean},
                       #column{ name = <<"b">>, type = boolean}],
@@ -471,12 +473,13 @@ bind_varchar_test() ->
     ok = educkdb:bind_varchar(Insert, 1, "hello"),
     ok = educkdb:bind_varchar(Insert, 2, "world"),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+    OkResult = x(Insert),
 
     ok = educkdb:bind_varchar(Insert, 1, <<"😀"/utf8>>),
     ok = educkdb:bind_varchar(Insert, 2, <<"1234567890">>),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     Expected = {ok,[ #column{ name = <<"a">>, type = varchar},#column{ name = <<"b">>, type = varchar}],
                 [{<<"hello">>,<<"world">>}, {<<240,159,152,128>>,<<"1234567890">>}]},
