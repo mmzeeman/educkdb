@@ -55,7 +55,6 @@
     %% Results
     result_extract/1,
     fetch_chunk/1,
-    get_chunk/2,
     get_chunks/1,
     chunk_count/1,
     column_names/1,
@@ -469,14 +468,6 @@ get_chunks(_Result) ->
     when QueryResult :: result(),
          DataChunk :: data_chunk().
 fetch_chunk(_Result) -> 
-    erlang:nif_error(nif_library_not_loaded).
-
-%% @doc Get a data chunk from a query result. (deprecated)
--spec get_chunk(QueryResult, Idx) -> DataChunk 
-    when QueryResult :: result(),
-         Idx :: non_neg_integer(),
-         DataChunk :: data_chunk().
-get_chunk(_Result, _ChunkIndex) -> 
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Get the number of data chunks in a query result. (deprecated)

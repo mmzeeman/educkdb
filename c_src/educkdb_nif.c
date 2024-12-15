@@ -1272,48 +1272,6 @@ educkdb_fetch_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
-educkdb_get_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-    educkdb_result *res;
-    ErlNifUInt64 index;
-    duckdb_data_chunk chunk;
-    educkdb_data_chunk *echunk;
-    ERL_NIF_TERM rchunk;
-
-    if(argc != 2) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_resource(env, argv[0], educkdb_result_type, (void **) &res)) {
-        return enif_make_badarg(env);
-    }
-
-    if(!enif_get_uint64(env, argv[1], &index)) {
-        return enif_make_badarg(env);
-    } 
-
-    if(index > duckdb_result_chunk_count(res->result)) {
-        return enif_make_badarg(env);
-    }
-
-    chunk = duckdb_result_get_chunk(res->result, index);
-    if(chunk == NULL) {
-        return enif_raise_exception(env, make_atom(env, "no_chunk"));
-    }
-
-    echunk = enif_alloc_resource(educkdb_data_chunk_type, sizeof(educkdb_data_chunk));
-    if(!echunk) {
-        duckdb_destroy_data_chunk(&chunk);
-        return enif_raise_exception(env, make_atom(env, "no_memory"));
-    }
-
-    echunk->data_chunk = chunk;
-    rchunk = enif_make_resource(env, echunk);
-    enif_release_resource(echunk);
-
-    return rchunk;
-}
- 
-static ERL_NIF_TERM
 make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) { 
     ERL_NIF_TERM chunks[chunk_count];
 
@@ -2621,7 +2579,6 @@ static ErlNifFunc nif_funcs[] = {
     {"chunk_count", 1, educkdb_chunk_count}, /* deprecated */
     {"column_names", 1, educkdb_column_names},
     {"fetch_chunk", 1, educkdb_fetch_chunk},
-    {"get_chunk", 2, educkdb_get_chunk}, /* deprecated */
     {"get_chunks", 1, educkdb_get_chunks},
 
     // Chunks
