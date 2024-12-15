@@ -221,35 +221,37 @@ bind_int_test() ->
     ok = educkdb:bind_int32(Insert, 3, 0),
     ok = educkdb:bind_int64(Insert, 4, 0),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
+
+    OkResult = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, 3),
     ok = educkdb:bind_int16(Insert, 2, 3),
     ok = educkdb:bind_int32(Insert, 3, 3),
     ok = educkdb:bind_int64(Insert, 4, 3),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, -3),
     ok = educkdb:bind_int16(Insert, 2, -3),
     ok = educkdb:bind_int32(Insert, 3, -3),
     ok = educkdb:bind_int64(Insert, 4, -3),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, ?INT8_MAX),
     ok = educkdb:bind_int16(Insert, 2, ?INT16_MAX),
     ok = educkdb:bind_int32(Insert, 3, ?INT32_MAX),
     ok = educkdb:bind_int64(Insert, 4, ?INT64_MAX),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ok = educkdb:bind_int8(Insert, 1, ?INT8_MIN),
     ok = educkdb:bind_int16(Insert, 2, ?INT16_MIN),
     ok = educkdb:bind_int32(Insert, 3, ?INT32_MIN),
     ok = educkdb:bind_int64(Insert, 4, ?INT64_MIN),
 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     ?assertEqual({ok,
                   [ #column{name = <<"a">>, type=tinyint},
