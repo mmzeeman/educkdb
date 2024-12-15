@@ -935,14 +935,16 @@ extract_test() ->
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10), (11), (12);"),
     C2 = educkdb:get_chunk(R2, 0),
-    ?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
+    %?assertEqual( [ #{ type => bigint, data => [3] } ], educkdb:extract_chunk(C2)),
+
     ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
     ?assertEqual( [ [3] ], educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:get_chunk(R3, 0),
-    ?assertEqual( [ #{ type => integer, data => [10, 11, 12] } ],
-       educkdb:extract_chunk(C3)),
+
+    ?assertEqual( [ integer ], educkdb:chunk_column_types(C3)),
+    ?assertEqual( [ [10, 11, 12] ], educkdb:chunk_columns(C3)),
 
     ok.
 
