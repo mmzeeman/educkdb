@@ -395,20 +395,22 @@ bind_timestamp_test() ->
     %%
     %% Test bind
     %%
+    
+    OkResult = {ok, [#column{ name = <<"Count">>, type = bigint}], [{1}]},
 
     {ok, Insert} = educkdb:prepare(Conn, "insert into test values($1);"),
 
     %% Plain milliseconds since 0, 1, 1
     ok = educkdb:bind_timestamp(Insert, 1, 0), 
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     %% Plain erlang date-time tuple
     ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8,0,0}}),
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     %% Erlang timestamp
     ok = educkdb:bind_timestamp(Insert, 1, {1647, 729383, 983105}),
-    {ok, [ #{ data := [1] } ]} = x(Insert),
+    OkResult = x(Insert),
 
     %% Results are returned in fp
     ?assertEqual(
