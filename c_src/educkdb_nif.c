@@ -70,8 +70,6 @@ typedef struct {
     duckdb_appender appender;
 } educkdb_appender;
 
-// Not exported for c-api, see: string_type.hpp
-
 // Not exported for c api. Search for list_entry_t in header files.
 typedef struct {
     uint64_t offset;
@@ -137,7 +135,7 @@ static void
 destruct_educkdb_database(ErlNifEnv *env, void *arg)
 {
     educkdb_database *database = (educkdb_database *) arg;
-    duckdb_close(&(database->database));
+    duckdb_close(&database->database);
 }
  
 /*
@@ -145,8 +143,8 @@ destruct_educkdb_database(ErlNifEnv *env, void *arg)
  */
 static void
 destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
-    educkdb_connection *conn = (educkdb_connection *) arg;
-    duckdb_disconnect(&(conn->connection));
+    educkdb_connection *connection = (educkdb_connection *) arg;
+    duckdb_disconnect(&connection->connection);
 }
 
 /*
@@ -156,7 +154,7 @@ destruct_educkdb_connection(ErlNifEnv *env, void *arg) {
 static void
 destruct_educkdb_result(ErlNifEnv *env, void *arg) {
     educkdb_result *res = (educkdb_result *) arg;
-    duckdb_destroy_result(&(res->result));
+    duckdb_destroy_result(&res->result);
 }
 
 static void
@@ -164,7 +162,7 @@ destruct_educkdb_data_chunk(ErlNifEnv *env, void *arg) {
     educkdb_data_chunk *chunk = (educkdb_data_chunk *) arg;
 
     if(chunk->data_chunk) {
-        duckdb_destroy_data_chunk(&(chunk->data_chunk));
+        duckdb_destroy_data_chunk(&chunk->data_chunk);
         chunk->data_chunk = NULL;
     }
 }
@@ -178,7 +176,7 @@ destruct_educkdb_prepared_statement(ErlNifEnv *env, void *arg) {
         stmt->connection = NULL;
     }
 
-    duckdb_destroy_prepare(&(stmt->statement));
+    duckdb_destroy_prepare(&stmt->statement);
 }
 
 static void
@@ -191,7 +189,7 @@ destruct_educkdb_appender(ErlNifEnv *env, void *arg) {
     }
 
     /* Does a flush close and destroy */
-    duckdb_appender_destroy(&(appender->appender));
+    duckdb_appender_destroy(&appender->appender);
 }
 
 static const char*
@@ -350,7 +348,7 @@ educkdb_close(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    duckdb_close(&(db->database));
+    destruct_educkdb_database(env, (void *) db);
 
     return atom_ok;
 }
@@ -396,7 +394,8 @@ static ERL_NIF_TERM
 educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
     educkdb_database *db;
-    educkdb_connection *conn;
+    educkdb_connection *connection;
+    duckdb_connection con;
     ERL_NIF_TERM db_conn;
 
     if(argc != 1) {
@@ -407,22 +406,25 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    /* Initialize the connection resource */
-    conn = enif_alloc_resource(educkdb_connection_type, sizeof(educkdb_connection));
-    if(!conn) {
-        return enif_raise_exception(env, make_atom(env, "no_memory"));
-    }
-
     /* Connect to the database. Internally this can mean the new connections
      * has to wait on a lock from the database connection manager. So this 
-     * call must be dirty */
-    if(duckdb_connect(db->database, &(conn->connection)) == DuckDBError) {
-        enif_release_resource(conn);
+     * call must be dirty
+     */ 
+    if(duckdb_connect(db->database, &con) == DuckDBError) {
         return make_error_tuple(env, "duckdb_connect");
     }
 
-    db_conn = enif_make_resource(env, conn);
-    enif_release_resource(conn);
+    /* Initialize the connection resource */
+    connection = enif_alloc_resource(educkdb_connection_type, sizeof(educkdb_connection));
+    if(!connection) {
+        duckdb_disconnect(&con);
+        return enif_raise_exception(env, make_atom(env, "no_memory"));
+    }
+
+    connection->connection = con;
+
+    db_conn = enif_make_resource(env, connection);
+    enif_release_resource(connection);
 
     return make_ok_tuple(env, db_conn);
 }

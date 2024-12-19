@@ -863,6 +863,14 @@ current_schema_test() ->
     ?assertEqual(Expected, educkdb:squery(Conn, "SELECT UNNEST(current_schemas(true)) as current_schemas;")),
     ok.
 
+connect_after_close_test() ->
+    %% API misuse
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    ok = educkdb:close(Db),
+    ok = educkdb:disconnect(Conn),
+    {error, duckdb_connect} = educkdb:connect(Db),
+    ok.
 
 garbage_collect_test() ->
     F = fun() ->
