@@ -533,161 +533,141 @@ is_valid(uint64_t *validity_mask, idx_t row_idx) {
 
 static ERL_NIF_TERM
 extract_data_boolean(ErlNifEnv *env, bool *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            if(*(vector_data + i)) {
-                cell = atom_true;
+    for(idx_t i = 0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            if(*(vector_data + i + offset)) {
+                data[i] = atom_true;
             } else {
-                cell = atom_false;
+                data[i] = atom_false;
             }
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_utinyint(ErlNifEnv *env, uint8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_usmallint(ErlNifEnv *env, uint16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uinteger(ErlNifEnv *env, uint32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_ubigint(ErlNifEnv *env, uint64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint64(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint64(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_tinyint(ErlNifEnv *env, int8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env, *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env,  *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_integer(ErlNifEnv *env, int32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env,  *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int64(env, *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int64(env, *(vector_data + i + offset));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
