@@ -203,6 +203,7 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_TIME:         return "time";
         case DUCKDB_TYPE_INTERVAL:     return "interval";
         case DUCKDB_TYPE_HUGEINT:      return "hugeint";
+        case DUCKDB_TYPE_UHUGEINT:     return "uhugeint";
         case DUCKDB_TYPE_VARCHAR:      return "varchar";
         case DUCKDB_TYPE_BLOB:         return "blob";
         case DUCKDB_TYPE_DECIMAL:      return "decimal";
@@ -213,10 +214,18 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_LIST:         return "list";
         case DUCKDB_TYPE_STRUCT:       return "struct";
         case DUCKDB_TYPE_MAP:          return "map";
+        case DUCKDB_TYPE_ARRAY:        return "array";
         case DUCKDB_TYPE_UUID:         return "uuid";
         case DUCKDB_TYPE_UNION:        return "union";
         case DUCKDB_TYPE_BIT:          return "bit";
+        case DUCKDB_TYPE_TIME_TZ:      return "time_tz";
+        case DUCKDB_TYPE_TIMESTAMP_TZ: return "timestamp_tz";
+        case DUCKDB_TYPE_VARINT:       return "varint";
+        case DUCKDB_TYPE_SQLNULL:      return "sqlnull";
     }
+
+    // When we are missing a DUCKDB_TYPE;
+    return "unknown";
 }
 
 static ERL_NIF_TERM
