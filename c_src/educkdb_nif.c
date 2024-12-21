@@ -814,68 +814,56 @@ extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *val
 
 static ERL_NIF_TERM
 extract_data_uint8_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint8_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            uint8_t enum_index = *(vector_data + i + offset);
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uint16_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint16_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            uint16_t enum_index = *(vector_data + i + offset);
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uint32_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint32_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            uint32_t enum_index = *(vector_data + i + offset);
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 
@@ -903,77 +891,66 @@ static ERL_NIF_TERM extract_data(ErlNifEnv *, duckdb_logical_type, duckdb_vector
  
 static ERL_NIF_TERM
 extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, duckdb_list_entry_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
     duckdb_vector child_vector = duckdb_list_vector_get_child(vector);
     duckdb_logical_type list_child_type = duckdb_list_type_child_type(logical_type);
 
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_list_entry_t entry = *(vector_data + i);
-            cell = extract_data(env, list_child_type, child_vector, entry.offset, entry.length);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            duckdb_list_entry_t entry = *(vector_data + i + offset);
+            data[i] = extract_data(env, list_child_type, child_vector, entry.offset, entry.length);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
+
     duckdb_destroy_logical_type(&list_child_type);
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 
 static ERL_NIF_TERM
 extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    // [todo] We can extract an array with names here, and reuse for all results instead of re-creating it.
+    ERL_NIF_TERM data[count];
     idx_t child_count = duckdb_struct_type_child_count(logical_type);
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_new_map(env);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_new_map(env);
 
             for(idx_t j=0; j < child_count; j++) {
+                char *child_name = duckdb_struct_type_child_name(logical_type, j);
+                ERL_NIF_TERM key = make_binary(env, child_name, strlen(child_name));
+                duckdb_free(child_name);
+
                 duckdb_logical_type child_type = duckdb_struct_type_child_type(logical_type, j);
                 duckdb_vector child_vector = duckdb_struct_vector_get_child(vector, j);
-                char *child_name = duckdb_struct_type_child_name(logical_type, j);
-
-                ERL_NIF_TERM key = make_binary(env, child_name, strlen(child_name));
                 ERL_NIF_TERM list = extract_data(env, child_type, child_vector, i, 1);
+                duckdb_destroy_logical_type(&child_type);
+
                 ERL_NIF_TERM value, tail;
                 enif_get_list_cell(env, list, &value, &tail);
 
-                enif_make_map_put(env, cell, key, value, &cell);
-
-                duckdb_destroy_logical_type(&child_type);
-                duckdb_free(child_name);
+                enif_make_map_put(env, data[i], key, value, &data[i]);
             }
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_no_extract(ErlNifEnv *env, const char *type_name, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell = enif_make_tuple2(env, make_atom(env, "no_extract"), make_atom(env, type_name));
-        data = enif_make_list_cell(env, cell, data);
+    for(idx_t i=0; i < count; i++) {
+        data[i] = enif_make_tuple2(env, make_atom(env, "no_extract"), make_atom(env, type_name));
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
@@ -1147,6 +1124,19 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
  * Chunks
  */
 
+
+static ERL_NIF_TERM
+extract_column_names(ErlNifEnv *env, duckdb_result result, idx_t count) {
+    ERL_NIF_TERM names[count];
+
+    for(idx_t i=0; i < count; i++) {
+        const char *name = duckdb_column_name(&result, i);
+        names[i] = make_binary(env, name, strlen(name));
+    }
+
+    return enif_make_list_from_array(env, names, count); 
+}
+
 static ERL_NIF_TERM
 educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_result *res;
@@ -1159,18 +1149,8 @@ educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    idx_t column_count = duckdb_column_count(&(res->result));
-
-    ERL_NIF_TERM column_names = enif_make_list(env, 0);
-
-    for(idx_t i=column_count; i-- > 0; ) {
-        const char *column_name = duckdb_column_name(&(res->result), i);
-        ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
-
-        column_names = enif_make_list_cell(env, name_binary, column_names);
-    }
-
-    return column_names;
+    idx_t count = duckdb_column_count(&res->result);
+    return extract_column_names(env, res->result, count);
 }
 
 static ERL_NIF_TERM
