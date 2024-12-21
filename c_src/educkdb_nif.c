@@ -1111,9 +1111,7 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
         duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
         duckdb_type type_id = duckdb_get_type_id(logical_type);
 
-        ERL_NIF_TERM data = extract_data(env, logical_type, vector, 0, tuple_count);
-
-        column[i] = data;
+        column[i] = extract_data(env, logical_type, vector, 0, tuple_count);
     }
 
     return enif_make_list_from_array(env, column, column_count); 
@@ -2487,14 +2485,14 @@ static ErlNifFunc nif_funcs[] = {
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Queries
-    {"prepare", 2, educkdb_prepare},
+    {"prepare", 2, educkdb_prepare, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"query", 2, educkdb_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Result
     {"column_names", 1, educkdb_column_names},
-    {"fetch_chunk", 1, educkdb_fetch_chunk},
-    {"get_chunks", 1, educkdb_get_chunks},
+    {"fetch_chunk", 1, educkdb_fetch_chunk, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"get_chunks", 1, educkdb_get_chunks, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Chunks
     {"chunk_column_count", 1, educkdb_chunk_get_column_count},
