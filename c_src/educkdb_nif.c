@@ -386,9 +386,6 @@ educkdb_config_flag_info(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 /*
  * connect
  *
- * Creates the communication thread for operations which potentially can't finish
- * within 1ms. 
- *
  */
 static ERL_NIF_TERM
 educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
@@ -432,8 +429,6 @@ educkdb_connect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 /*
  * disconnect
  *
- * Finalizes the communication thread, and disconnects the connection.
- *
  */
 static ERL_NIF_TERM
 educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
@@ -448,9 +443,6 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    /* Simply call destruct, so the thread stops and disconnect.
-     * Note: this will immediately remove all commands from the queue.
-     */
     destruct_educkdb_connection(env, (void *)conn);
 
     return atom_ok;
@@ -460,12 +452,6 @@ educkdb_disconnect(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
  * Query
  */
 
-/*
- * query
- *
- * Check the input values, and put the command on the queue to make
- * sure queries are handled in one calling thread.
- */
 static ERL_NIF_TERM
 educkdb_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_connection *conn;
@@ -1345,15 +1331,6 @@ educkdb_prepare(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return make_ok_tuple(env, eprepared_statement);
 }
 
-/*
- * execute_prepared
- *
- * Check the input values, and put the command on the queue to make
- * sure queries are handled in one calling thread. Queries can also
- * run for an unknown amount of time, so instead of scheduling it on
- * a dirty scheduler, pass the reference to the prepared statement
- * via the queue, and run the query.
- */
 static ERL_NIF_TERM
 educkdb_execute_prepared(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
