@@ -759,12 +759,11 @@ extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *vali
 
 static ERL_NIF_TERM
 extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_hugeint huge = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            duckdb_hugeint huge = *(vector_data + i + offset);
             char buf[16];
 
             // First bit is flipped because of sorting.
@@ -788,36 +787,29 @@ extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validit
             buf[14] = huge.lower >>  8 & 0xFF; 
             buf[15] = huge.lower       & 0xFF; 
 
-            cell = make_binary(env, buf, sizeof(buf));
+            data[i] = make_binary(env, buf, sizeof(buf));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_string_t value = *(vector_data + i);
-            cell = make_binary(env,
-                    duckdb_string_t_data(&value),
-                    duckdb_string_t_length(value));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            duckdb_string_t value = *(vector_data + i + offset);
+            data[i] = make_binary(env, duckdb_string_t_data(&value), duckdb_string_t_length(value));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
