@@ -752,20 +752,18 @@ extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_m
 
 static ERL_NIF_TERM
 extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_hugeint huge = *(vector_data + i);
-            cell = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
+    for(idx_t i=0; i < count; i++) {
+        if(validity_mask == NULL || is_valid(validity_mask, i + offset)) {
+            duckdb_hugeint huge = *(vector_data + i + offset);
+            data[i] = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
