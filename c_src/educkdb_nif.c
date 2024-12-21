@@ -114,18 +114,9 @@ make_error_tuple(ErlNifEnv *env, const char *reason)
 static ERL_NIF_TERM
 make_binary(ErlNifEnv *env, const void *bytes, unsigned int size)
 {
-    ErlNifBinary blob;
-    ERL_NIF_TERM term;
-
-    if(!enif_alloc_binary(size, &blob)) {
-        return atom_error;
-    }
-
-    memcpy(blob.data, bytes, size);
-    term = enif_make_binary(env, &blob);
-    enif_release_binary(&blob);
-
-    return term;
+    ERL_NIF_TERM result;
+    memcpy(enif_make_new_binary(env, size, &result), bytes, size);
+    return result;
 }
 
 /*
