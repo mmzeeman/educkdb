@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Maas-Maarten Zeeman
+ * Copyright 2022-2024 Maas-Maarten Zeeman
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,18 +114,9 @@ make_error_tuple(ErlNifEnv *env, const char *reason)
 static ERL_NIF_TERM
 make_binary(ErlNifEnv *env, const void *bytes, unsigned int size)
 {
-    ErlNifBinary blob;
-    ERL_NIF_TERM term;
-
-    if(!enif_alloc_binary(size, &blob)) {
-        return atom_error;
-    }
-
-    memcpy(blob.data, bytes, size);
-    term = enif_make_binary(env, &blob);
-    enif_release_binary(&blob);
-
-    return term;
+    ERL_NIF_TERM result;
+    memcpy(enif_make_new_binary(env, size, &result), bytes, size);
+    return result;
 }
 
 /*
@@ -212,6 +203,7 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_TIME:         return "time";
         case DUCKDB_TYPE_INTERVAL:     return "interval";
         case DUCKDB_TYPE_HUGEINT:      return "hugeint";
+        case DUCKDB_TYPE_UHUGEINT:     return "uhugeint";
         case DUCKDB_TYPE_VARCHAR:      return "varchar";
         case DUCKDB_TYPE_BLOB:         return "blob";
         case DUCKDB_TYPE_DECIMAL:      return "decimal";
@@ -222,10 +214,18 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_LIST:         return "list";
         case DUCKDB_TYPE_STRUCT:       return "struct";
         case DUCKDB_TYPE_MAP:          return "map";
+        case DUCKDB_TYPE_ARRAY:        return "array";
         case DUCKDB_TYPE_UUID:         return "uuid";
         case DUCKDB_TYPE_UNION:        return "union";
         case DUCKDB_TYPE_BIT:          return "bit";
+        case DUCKDB_TYPE_TIME_TZ:      return "time_tz";
+        case DUCKDB_TYPE_TIMESTAMP_TZ: return "timestamp_tz";
+        case DUCKDB_TYPE_VARINT:       return "varint";
+        case DUCKDB_TYPE_SQLNULL:      return "sqlnull";
     }
+
+    // When we are missing a DUCKDB_TYPE;
+    return "unknown";
 }
 
 static ERL_NIF_TERM
@@ -522,290 +522,248 @@ make_time_tuple(ErlNifEnv *env, duckdb_time_struct time) {
  * Extract result, chunk version 
  */
 
-
-// [todo] Make a macro for the repeated code.
-inline static bool
-is_valid(uint64_t *validity_mask, idx_t row_idx) {
-    idx_t entry_idx = row_idx / 64;
-    idx_t idx_in_entry = row_idx % 64;
-    return validity_mask[entry_idx] & (1 << idx_in_entry);
-}
-
 static ERL_NIF_TERM
 extract_data_boolean(ErlNifEnv *env, bool *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            if(*(vector_data + i)) {
-                cell = atom_true;
+    for(idx_t i = 0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            if(vector_data[i + offset]) {
+                data[i] = atom_true;
             } else {
-                cell = atom_false;
+                data[i] = atom_false;
             }
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_utinyint(ErlNifEnv *env, uint8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_usmallint(ErlNifEnv *env, uint16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uinteger(ErlNifEnv *env, uint32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_ubigint(ErlNifEnv *env, uint64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_uint64(env, *(vector_data + i));
+    for(idx_t i = 0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_uint64(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_tinyint(ErlNifEnv *env, int8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env, *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env,  *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_integer(ErlNifEnv *env, int32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int(env,  *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_int64(env, *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int64(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_float(ErlNifEnv *env, float *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_double(env, (double) *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_double(env, (double) vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_double(ErlNifEnv *env, double *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_double(env,  *(vector_data + i));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_double(env, vector_data[i + offset]);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_timestamp(ErlNifEnv *env, duckdb_timestamp *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_timestamp_struct timestamp = duckdb_from_timestamp(*(vector_data + i));
-            cell = enif_make_tuple2(env,
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_timestamp_struct timestamp = duckdb_from_timestamp(vector_data[i + offset]);
+            data[i] = enif_make_tuple2(env,
                     make_date_tuple(env, timestamp.date),
                     make_time_tuple(env, timestamp.time));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_date(ErlNifEnv *env, duckdb_date *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_date_struct date = duckdb_from_date(*(vector_data + i));
-            cell = make_date_tuple(env, date);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_date_struct date = duckdb_from_date(vector_data[i + offset]);
+            data[i] = make_date_tuple(env, date);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_time_struct time = duckdb_from_time(*(vector_data + i));
-            cell = make_time_tuple(env, time);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_time_struct time= duckdb_from_time(vector_data[i + offset]);
+            data[i] = make_time_tuple(env, time);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_hugeint huge = *(vector_data + i);
-            cell = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_hugeint huge = vector_data[i + offset];
+            data[i] = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_hugeint huge = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_hugeint huge = vector_data[i + offset];
             char buf[16];
 
             // First bit is flipped because of sorting.
@@ -829,102 +787,83 @@ extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validit
             buf[14] = huge.lower >>  8 & 0xFF; 
             buf[15] = huge.lower       & 0xFF; 
 
-            cell = make_binary(env, buf, sizeof(buf));
+            data[i] = make_binary(env, buf, sizeof(buf));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_string_t value = *(vector_data + i);
-            cell = make_binary(env,
-                    duckdb_string_t_data(&value),
-                    duckdb_string_t_length(value));
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_string_t value = vector_data[i + offset];
+            data[i] = make_binary(env, duckdb_string_t_data(&value), duckdb_string_t_length(value));
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uint8_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint8_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint8_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            uint8_t enum_index = vector_data[i + offset];
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uint16_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint16_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint16_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            uint16_t enum_index = vector_data[i + offset];
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_uint32_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint32_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            uint32_t enum_index = *(vector_data + i);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            uint32_t enum_index = vector_data[i + offset];
             char *value = duckdb_enum_dictionary_value(logical_type, (idx_t) enum_index);
-            cell = make_binary(env, value, strlen(value));
+            data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 
@@ -952,77 +891,66 @@ static ERL_NIF_TERM extract_data(ErlNifEnv *, duckdb_logical_type, duckdb_vector
  
 static ERL_NIF_TERM
 extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, duckdb_list_entry_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
     duckdb_vector child_vector = duckdb_list_vector_get_child(vector);
     duckdb_logical_type list_child_type = duckdb_list_type_child_type(logical_type);
 
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            duckdb_list_entry_t entry = *(vector_data + i);
-            cell = extract_data(env, list_child_type, child_vector, entry.offset, entry.length);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_list_entry_t entry = vector_data[i + offset];
+            data[i] = extract_data(env, list_child_type, child_vector, entry.offset, entry.length);
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
+
     duckdb_destroy_logical_type(&list_child_type);
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 
 static ERL_NIF_TERM
 extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logical_type, uint64_t *validity_mask, uint64_t offset, uint64_t count)  {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
-
-    // [todo] We can extract an array with names here, and reuse for all results instead of re-creating it.
+    ERL_NIF_TERM data[count];
     idx_t child_count = duckdb_struct_type_child_count(logical_type);
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell;
-
-        if(validity_mask == NULL || is_valid(validity_mask, i)) {
-            cell = enif_make_new_map(env);
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_new_map(env);
 
             for(idx_t j=0; j < child_count; j++) {
+                char *child_name = duckdb_struct_type_child_name(logical_type, j);
+                ERL_NIF_TERM key = make_binary(env, child_name, strlen(child_name));
+                duckdb_free(child_name);
+
                 duckdb_logical_type child_type = duckdb_struct_type_child_type(logical_type, j);
                 duckdb_vector child_vector = duckdb_struct_vector_get_child(vector, j);
-                char *child_name = duckdb_struct_type_child_name(logical_type, j);
-
-                ERL_NIF_TERM key = make_binary(env, child_name, strlen(child_name));
                 ERL_NIF_TERM list = extract_data(env, child_type, child_vector, i, 1);
+                duckdb_destroy_logical_type(&child_type);
+
                 ERL_NIF_TERM value, tail;
                 enif_get_list_cell(env, list, &value, &tail);
 
-                enif_make_map_put(env, cell, key, value, &cell);
-
-                duckdb_destroy_logical_type(&child_type);
-                duckdb_free(child_name);
+                enif_make_map_put(env, data[i], key, value, &data[i]);
             }
         } else {
-            cell = atom_null;
+            data[i] = atom_null;
         }
-
-        data = enif_make_list_cell(env, cell, data);
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
 extract_data_no_extract(ErlNifEnv *env, const char *type_name, uint64_t offset, uint64_t count) {
-    ERL_NIF_TERM data = enif_make_list(env, 0);
+    ERL_NIF_TERM data[count];
 
-    for(idx_t i=count+offset; i-- > offset; ) {
-        ERL_NIF_TERM cell = enif_make_tuple2(env, make_atom(env, "no_extract"), make_atom(env, type_name));
-        data = enif_make_list_cell(env, cell, data);
+    for(idx_t i=0; i < count; i++) {
+        data[i] = enif_make_tuple2(env, make_atom(env, "no_extract"), make_atom(env, type_name));
     }
 
-    return data;
+    return enif_make_list_from_array(env, data, count);
 }
 
 static ERL_NIF_TERM
@@ -1183,9 +1111,7 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
         duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
         duckdb_type type_id = duckdb_get_type_id(logical_type);
 
-        ERL_NIF_TERM data = extract_data(env, logical_type, vector, 0, tuple_count);
-
-        column[i] = data;
+        column[i] = extract_data(env, logical_type, vector, 0, tuple_count);
     }
 
     return enif_make_list_from_array(env, column, column_count); 
@@ -1195,6 +1121,19 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
 /**
  * Chunks
  */
+
+
+static ERL_NIF_TERM
+extract_column_names(ErlNifEnv *env, duckdb_result result, idx_t count) {
+    ERL_NIF_TERM names[count];
+
+    for(idx_t i=0; i < count; i++) {
+        const char *name = duckdb_column_name(&result, i);
+        names[i] = make_binary(env, name, strlen(name));
+    }
+
+    return enif_make_list_from_array(env, names, count); 
+}
 
 static ERL_NIF_TERM
 educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1208,18 +1147,8 @@ educkdb_column_names(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    idx_t column_count = duckdb_column_count(&(res->result));
-
-    ERL_NIF_TERM column_names = enif_make_list(env, 0);
-
-    for(idx_t i=column_count; i-- > 0; ) {
-        const char *column_name = duckdb_column_name(&(res->result), i);
-        ERL_NIF_TERM name_binary = make_binary(env, column_name, strlen(column_name));
-
-        column_names = enif_make_list_cell(env, name_binary, column_names);
-    }
-
-    return column_names;
+    idx_t count = duckdb_column_count(&res->result);
+    return extract_column_names(env, res->result, count);
 }
 
 static ERL_NIF_TERM
@@ -2556,14 +2485,14 @@ static ErlNifFunc nif_funcs[] = {
     {"disconnect", 1, educkdb_disconnect, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Queries
-    {"prepare", 2, educkdb_prepare},
+    {"prepare", 2, educkdb_prepare, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"query", 2, educkdb_query, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"execute_prepared", 1, educkdb_execute_prepared, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Result
     {"column_names", 1, educkdb_column_names},
-    {"fetch_chunk", 1, educkdb_fetch_chunk},
-    {"get_chunks", 1, educkdb_get_chunks},
+    {"fetch_chunk", 1, educkdb_fetch_chunk, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"get_chunks", 1, educkdb_get_chunks, ERL_NIF_DIRTY_JOB_IO_BOUND},
 
     // Chunks
     {"chunk_column_count", 1, educkdb_chunk_get_column_count},

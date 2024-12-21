@@ -1130,7 +1130,7 @@ blob_test() ->
 uhugeint_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    Expected = {ok, [#column{ name = <<"CAST(1 AS UHUGEINT)">>, type = invalid}], [ { {no_extract,uhugeint} } ]},
+    Expected = {ok, [#column{ name = <<"CAST(1 AS UHUGEINT)">>, type = uhugeint}], [ { {no_extract,uhugeint} } ]},
     ?assertMatch(Expected, educkdb:squery(Conn, "SELECT 1::uhugeint;")),
     ok.
 
