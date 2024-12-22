@@ -62,7 +62,8 @@ typedef struct {
 } educkdb_result;
 
 typedef struct {
-    duckdb_data_chunk data_chunk;
+    educkdb_result *result;
+    duckdb_data_chunk data_chunk; 
 } educkdb_data_chunk;
 
 typedef struct {
@@ -152,10 +153,12 @@ static void
 destruct_educkdb_data_chunk(ErlNifEnv *env, void *arg) {
     educkdb_data_chunk *chunk = (educkdb_data_chunk *) arg;
 
-    if(chunk->data_chunk) {
-        duckdb_destroy_data_chunk(&chunk->data_chunk);
-        chunk->data_chunk = NULL;
+    if(chunk->result) {
+        enif_release_resource(chunk->result);
+        chunk->result = NULL;
     }
+
+    duckdb_destroy_data_chunk(&chunk->data_chunk);
 }
 
 static void
@@ -1164,6 +1167,9 @@ educkdb_fetch_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
+    enif_keep_resource(res);
+    echunk->result = res;
+
     echunk->data_chunk = chunk;
     rchunk = enif_make_resource(env, echunk);
     enif_release_resource(echunk);
@@ -1172,11 +1178,11 @@ educkdb_fetch_chunk(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
-make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) { 
+make_chunks(ErlNifEnv *env, educkdb_result *result, idx_t chunk_count) { 
     ERL_NIF_TERM chunks[chunk_count];
 
     for(idx_t i=0; i < chunk_count; i++) {
-        duckdb_data_chunk chunk = duckdb_result_get_chunk(result, i);
+        duckdb_data_chunk chunk = duckdb_result_get_chunk(result->result, i);
         if(chunk == NULL) {
             return enif_raise_exception(env, make_atom(env, "no_chunk"));
         }
@@ -1187,8 +1193,11 @@ make_chunks(ErlNifEnv *env, duckdb_result result, idx_t chunk_count) {
             return enif_raise_exception(env, make_atom(env, "no_memory"));
         }
 
+        enif_keep_resource(result);
+        echunk->result = result;
         echunk->data_chunk = chunk;
         chunks[i] = enif_make_resource(env, echunk);
+
         enif_release_resource(echunk);
     }
 
@@ -1208,7 +1217,7 @@ educkdb_get_chunks(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     }
 
     idx_t chunk_count = duckdb_result_chunk_count(res->result);
-    return make_chunks(env, res->result, chunk_count);
+    return make_chunks(env, res, chunk_count);
 }
 
 
