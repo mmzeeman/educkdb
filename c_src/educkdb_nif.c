@@ -190,6 +190,7 @@ static const char*
 duckdb_type_name(duckdb_type t) {
     switch(t) {
         case DUCKDB_TYPE_INVALID:      return "invalid";
+        case DUCKDB_TYPE_ANY:          return "any";
         case DUCKDB_TYPE_BOOLEAN:      return "boolean";
         case DUCKDB_TYPE_TINYINT:      return "tinyint";
         case DUCKDB_TYPE_SMALLINT:     return "smallint";
@@ -1056,25 +1057,6 @@ extract_data(ErlNifEnv *env, duckdb_logical_type logical_type, duckdb_vector vec
 }
 
 static ERL_NIF_TERM
-extract_vector_map(ErlNifEnv *env, duckdb_vector vector, idx_t tuple_count) {
-    ERL_NIF_TERM vector_map = enif_make_new_map(env);
-    duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
-    duckdb_type type_id = duckdb_get_type_id(logical_type);
-
-    const char *type_name = duckdb_type_name(type_id);
-    ERL_NIF_TERM type_atom = make_atom(env, type_name);
-    if(enif_make_map_put(env, vector_map, atom_type, type_atom, &vector_map)) { }
-
-    // Data
-    ERL_NIF_TERM data = extract_data(env, logical_type, vector, 0, tuple_count);
-    if(enif_make_map_put(env, vector_map, atom_data, data, &vector_map)) { }
-
-    duckdb_destroy_logical_type(&logical_type);
-
-    return vector_map;
-}
-
-static ERL_NIF_TERM
 extract_chunk_types(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_count) {
     ERL_NIF_TERM column[column_count];
 
@@ -1098,7 +1080,6 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
     for(idx_t i=0; i < column_count; i++) {
         duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, i);
         duckdb_logical_type logical_type = duckdb_vector_get_column_type(vector);
-        duckdb_type type_id = duckdb_get_type_id(logical_type);
 
         column[i] = extract_data(env, logical_type, vector, 0, tuple_count);
     }
@@ -1242,7 +1223,6 @@ educkdb_chunk_get_column_count(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv
 static ERL_NIF_TERM
 educkdb_chunk_get_column_types(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_data_chunk *chunk;
-    idx_t count;
 
     if(argc != 1) {
         return enif_make_badarg(env);

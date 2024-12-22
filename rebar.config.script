@@ -6,7 +6,7 @@ CXXFlagsDefault = "$CXXFLAGS -Os -std=c++11".
 DrvLdFlagsDefault = "-shared -lduckdb".
 
 DrvLdFlags =
-    case os:getenv("ESQLITE_CFLAGS") of
+    case os:getenv("EDUCKDB_CFLAGS") of
         NotDefined when NotDefined == false; NotDefined == [] ->
             DrvLdFlagsDefault;
         DrvLdFlagsOverride ->
@@ -14,7 +14,12 @@ DrvLdFlags =
     end.
 
 {NifSources, LdEnv, CFlagsExt, CXXFlagsExt} =
-    {NifStaticSources, [], " -Ic_src/duckdb", ""}.
+    case os:getenv("EDUCKDB_USE_SYSTEM") of
+        NotDefined when NotDefined == false; NotDefined == [] ->
+            {NifStaticSources, [], " -Ic_src/duckdb", []};
+        _Defined ->
+            {NifSharedSources, [{"DRV_LDFLAGS", DrvLdFlags}], [], []}
+    end.
 
 CFlags =
     case os:getenv("EDUCKDB_CFLAGS") of
@@ -33,7 +38,7 @@ CXXFlags =
     end.
 
 [
-    {minimum_otp_vsn, "22.0"},
+    {minimum_otp_vsn, "25.0"},
 
     {erl_opts, [debug_info]},
 
@@ -44,7 +49,6 @@ CXXFlags =
                    deprecated_functions]},
 
     {port_env, [
-        %% Default darwin ldflags causes loading of system sqlite. Removed -bundle flag.
         {"darwin", "DRV_LDFLAGS", "-flat_namespace -undefined suppress $ERL_LDFLAGS"},
 
         {"solaris", "CFLAGS", "$CFLAGS -std=c99"},
@@ -80,6 +84,4 @@ CXXFlags =
                  {sort_functions, false}]},
 
     {hex, [{doc, edoc}]}
-
-
 ].
