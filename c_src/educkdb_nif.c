@@ -81,11 +81,13 @@ static ERL_NIF_TERM atom_educkdb;
 static ERL_NIF_TERM atom_ok;
 static ERL_NIF_TERM atom_error;
 static ERL_NIF_TERM atom_null;
+static ERL_NIF_TERM atom_undefined;
 static ERL_NIF_TERM atom_true;
 static ERL_NIF_TERM atom_false;
 static ERL_NIF_TERM atom_type;
 static ERL_NIF_TERM atom_data;
 static ERL_NIF_TERM atom_hugeint;
+static ERL_NIF_TERM null_term;
 
 
 static ERL_NIF_TERM
@@ -524,7 +526,7 @@ extract_data_boolean(ErlNifEnv *env, bool *vector_data, uint64_t *validity_mask,
                 data[i] = atom_false;
             }
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -539,7 +541,7 @@ extract_data_utinyint(ErlNifEnv *env, uint8_t *vector_data, uint64_t *validity_m
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -554,7 +556,7 @@ extract_data_usmallint(ErlNifEnv *env, uint16_t *vector_data, uint64_t *validity
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -569,7 +571,7 @@ extract_data_uinteger(ErlNifEnv *env, uint32_t *vector_data, uint64_t *validity_
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_uint(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -584,7 +586,7 @@ extract_data_ubigint(ErlNifEnv *env, uint64_t *vector_data, uint64_t *validity_m
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_uint64(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -599,7 +601,7 @@ extract_data_tinyint(ErlNifEnv *env, int8_t *vector_data, uint64_t *validity_mas
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -614,7 +616,7 @@ extract_data_smallint(ErlNifEnv *env, int16_t *vector_data, uint64_t *validity_m
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -629,7 +631,7 @@ extract_data_integer(ErlNifEnv *env, int32_t *vector_data, uint64_t *validity_ma
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_int(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -644,7 +646,7 @@ extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mas
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_int64(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -659,7 +661,7 @@ extract_data_float(ErlNifEnv *env, float *vector_data, uint64_t *validity_mask, 
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_double(env, (double) vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -674,7 +676,7 @@ extract_data_double(ErlNifEnv *env, double *vector_data, uint64_t *validity_mask
         if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
             data[i] = enif_make_double(env, vector_data[i + offset]);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -692,7 +694,7 @@ extract_data_timestamp(ErlNifEnv *env, duckdb_timestamp *vector_data, uint64_t *
                     make_date_tuple(env, timestamp.date),
                     make_time_tuple(env, timestamp.time));
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -708,7 +710,7 @@ extract_data_date(ErlNifEnv *env, duckdb_date *vector_data, uint64_t *validity_m
             duckdb_date_struct date = duckdb_from_date(vector_data[i + offset]);
             data[i] = make_date_tuple(env, date);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -724,7 +726,7 @@ extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_m
             duckdb_time_struct time= duckdb_from_time(vector_data[i + offset]);
             data[i] = make_time_tuple(env, time);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -740,7 +742,7 @@ extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *vali
             duckdb_hugeint huge = vector_data[i + offset];
             data[i] = enif_make_tuple3(env, atom_hugeint, enif_make_int64(env, huge.upper), enif_make_uint64(env, huge.lower));
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -779,7 +781,7 @@ extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validit
 
             data[i] = make_binary(env, buf, sizeof(buf));
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -795,7 +797,7 @@ extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *val
             duckdb_string_t value = vector_data[i + offset];
             data[i] = make_binary(env, duckdb_string_t_data(&value), duckdb_string_t_length(value));
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -813,7 +815,7 @@ extract_data_uint8_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint8_
             data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -831,7 +833,7 @@ extract_data_uint16_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint1
             data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -849,7 +851,7 @@ extract_data_uint32_enum(ErlNifEnv *env, duckdb_logical_type logical_type, uint3
             data[i] = make_binary(env, value, strlen(value));
             duckdb_free(value);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -890,7 +892,7 @@ extract_data_list(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type logi
             duckdb_list_entry_t entry = vector_data[i + offset];
             data[i] = extract_data(env, list_child_type, child_vector, entry.offset, entry.length);
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -925,7 +927,7 @@ extract_data_struct(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type lo
                 enif_make_map_put(env, data[i], key, value, &data[i]);
             }
         } else {
-            data[i] = atom_null;
+            data[i] = null_term;
         }
     }
 
@@ -2423,11 +2425,14 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_ok = make_atom(env, "ok");
     atom_error = make_atom(env, "error");
     atom_null = make_atom(env, "null");
+    atom_undefined = make_atom(env, "undefined");
     atom_true = make_atom(env, "true");
     atom_false = make_atom(env, "false");
     atom_type = make_atom(env, "type");
     atom_data = make_atom(env, "data");
     atom_hugeint = make_atom(env, "hugeint");
+
+    null_term = atom_undefined;
 
     return 0;
 }

@@ -203,9 +203,8 @@ open(Filename) ->
 open(_Filename, _Options) ->
     erlang:nif_error(nif_library_not_loaded).
 
-%% @doc Connect to the database. In the background a thread is started which 
-%%      is used by long running commands. Note: It is adviced to use the
-%%      connection in a single process.
+%% @doc Connect to the database. 
+%%      Note: It is adviced to use the connection in a single process.
 %%
 -spec connect(Database) -> Result
     when Database :: database(),
@@ -214,9 +213,7 @@ connect(_Db) ->
     erlang:nif_error(nif_library_not_loaded).
 
 
-%% @doc Disconnect from the database. Stops the thread.
-%%      The calling pid will receive:
-%%      {disconnect, Ref, ok | {error, _}}.
+%% @doc Disconnect from the database. 
 -spec disconnect(Connection) -> Result
     when Connection :: connection(),
          Result :: ok | {error, _}.

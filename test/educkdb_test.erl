@@ -11,7 +11,7 @@
 %% limitations under the License.
 %%
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022-2023 Maas-Maarten Zeeman
+%% @copyright 2022-2024 Maas-Maarten Zeeman
 %%
 %% @doc Test suite for educkdb
 %%
@@ -45,14 +45,6 @@ educk_db_version_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    %?assertEqual({ok,[#{data => [<<"v1.1.3">>],
-    %                    name => <<"library_version">>,
-    %                    type => varchar},
-    %                  #{data => [<<"19864453f7">>],
-    %                    name => <<"source_id">>,
-    %                    type => varchar}]},
-    %             educkdb:squery(Conn, <<"PRAGMA version;">>)),
-
     ?assertEqual({ok,[{column, <<"library_version">>, varchar},
                       {column, <<"source_id">>, varchar}
                      ], [{<<"v1.1.3">>, <<"19864453f7">>}]},
@@ -60,6 +52,7 @@ educk_db_version_test() ->
 
     ok = educkdb:disconnect(Conn),
     ok = educkdb:close(Db),
+
     ok.
 
 open_single_database_test() ->
@@ -126,7 +119,7 @@ query_test() ->
     ?assertEqual({ok,[#column{ name = <<"id">>, type = integer},
                       #column{ name = <<"x">>, type = varchar}],
                   [{10,<<"10">>},{20,<<"20">>},
-                   {null,<<"null">>}]},
+                   {undefined, <<"null">>}]},
                  educkdb:result_extract(Res5)),
 
     ok = educkdb:disconnect(Conn),
@@ -421,7 +414,7 @@ bind_null_test() ->
 
     ?assertEqual({ok, [#column{ name = <<"a">>, type = float},
                        #column{ name = <<"b">>, type = double }],
-                  [{null, null}]},
+                  [{undefined, undefined}]},
                  educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
@@ -956,7 +949,7 @@ boolean_extract_test() ->
 
     Result = {ok,[#column{ name = <<"a">>, type = boolean},
                   #column{ name = <<"b">>, type = boolean}],
-                     [{false, null}, {false, false}, {true, true}, {true, false}, {null, true}]},
+                     [{false, undefined}, {false, false}, {true, true}, {true, false}, {undefined, true}]},
     ?assertEqual(Result, educkdb:result_extract(R3)),
 
     ok.
@@ -1143,7 +1136,7 @@ enum_test() ->
     Expected1 = {ok,[#column{ name = <<"CAST('orange' AS rainbow)">>, type = enum}], [{<<"orange">>}]},
     ?assertEqual(Expected1, educkdb:squery(Conn, "select 'orange'::rainbow")),
 
-    Expected2 = {ok,[#column{ name = <<"b">>, type = enum}], [{<<"red">>}, {null}, {<<"orange">>}, {<<"yellow">>}, {<<"green">>}]},
+    Expected2 = {ok,[#column{ name = <<"b">>, type = enum}], [{<<"red">>}, {undefined}, {<<"orange">>}, {<<"yellow">>}, {<<"green">>}]},
     ?assertEqual(Expected2, 
                  educkdb:squery(Conn, "select a::rainbow as b from (values ('red'::rainbow), (null), ('orange'::rainbow), ('yellow'::rainbow), ('green'::rainbow)) color(a) ")),
 
@@ -1170,9 +1163,9 @@ list_test() ->
     %% Simple lists
     ?assertMatch({ok, [#column{ name = <<"a">>, type = list}], [{[1,2,3,4]}]},
                  educkdb:squery(Conn, "SELECT [1, 2, 3, 4] as a;")),
-    ?assertMatch({ok, [#column{ name = <<"a">>, type = list}], [{[1,2,null,4]}]},
+    ?assertMatch({ok, [#column{ name = <<"a">>, type = list}], [{[1,2,undefined,4]}]},
                  educkdb:squery(Conn, "SELECT [1, 2, null, 4] as a;")),
-    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[<<"one">>, <<"two">>, null, <<"three">>]}]},
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[<<"one">>, <<"two">>, undefined, <<"three">>]}]},
                  educkdb:squery(Conn, "SELECT ['one', 'two', null, 'three'] as a;")),
 
     %% Nested lists
@@ -1180,11 +1173,11 @@ list_test() ->
                  educkdb:squery(Conn, "SELECT [ [10, 20], [1,2,3,4], [1] ] as a;")),
 
     %% With null values
-    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[10,20],null,[1]]}]},
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[10,20],undefined,[1]]}]},
                  educkdb:squery(Conn, "SELECT [ [10, 20], null, [1] ] as a;")),
 
     %% With null values
-    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[[10,20]],[null],[[1]]]}]},
+    ?assertMatch({ok,[#column{ name = <<"a">>, type = list}], [{[[[10,20]],[undefined],[[1]]]}]},
                  educkdb:squery(Conn, "SELECT [ [ [10, 20] ], [null], [[1]] ] as a;")),
 
     ok.
@@ -1213,7 +1206,7 @@ struct_table_test() ->
     ?assertEqual({ok, [], []}, educkdb:squery(Conn, "SELECT * from test;")),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values (null);"),
-    ?assertEqual({ok, [#column{ name = <<"a">>, type = struct}],[{null}]}, 
+    ?assertEqual({ok, [#column{ name = <<"a">>, type = struct}],[{undefined}]}, 
                  educkdb:squery(Conn, "SELECT * from test;")),
 
     {ok, _, _} = educkdb:squery(Conn, "insert into test values ({i: 10, j: 20});"),
@@ -1222,7 +1215,7 @@ struct_table_test() ->
     ?assertEqual({ok,[#column{ name = <<"a">>, type = struct}],
                      [{#{<<"i">> => 10, <<"j">> => 20}},
                       {#{<<"i">> => 123, <<"j">> => 456}},
-                      {null}]},
+                      {undefined}]},
                  educkdb:squery(Conn, "SELECT * from test order by a.i;")),
 
     ok.
