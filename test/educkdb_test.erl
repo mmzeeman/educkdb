@@ -336,9 +336,9 @@ bind_date_and_time_test() ->
 
     Expected = {ok, [ #column{ name = <<"a">>, type = date},
                       #column{ name = <<"b">>, type = time}],
-                [{{1970,1,1},{0,0,0.0}},
-                 {{1970,8,11},{0,0,1.0}},
-                 {{2022,12,25},{8,12,10.1234}}]},
+                [{{1970,  1, 1},  {0,  0,  0}},
+                 {{1970,  8, 11}, {0,  0,  1}},
+                 {{2022, 12, 25}, {8, 12, 10.1234}}]},
     ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a")),
 
     ok.
@@ -356,9 +356,9 @@ extract_timestamp_test() ->
 
     ?assertEqual(
        {ok, [#column{name = <<"a">>, type = timestamp}],
-        [ { {{   0,  1,  1}, {0, 0, 0.0}} },
-          { {{1970,  1,  1}, {0, 0, 0.0}} },
-          { {{2003, 12, 25}, {0, 0, 0.0}} },
+        [ { {{   0,  1,  1}, {0, 0, 0}} },
+          { {{1970,  1,  1}, {0, 0, 0}} },
+          { {{2003, 12, 25}, {0, 0, 0}} },
           { {{2023,  4,  3}, {11, 23, 16.123456}} } ] },
        educkdb:squery(Conn, "select * from test order by a")),
 
@@ -382,7 +382,7 @@ bind_timestamp_test() ->
     OkResult = x(Insert),
 
     %% Plain erlang date-time tuple
-    ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8,0,0}}),
+    ok = educkdb:bind_timestamp(Insert, 1, {{1970, 8, 11}, {8, 0, 0}}),
     OkResult = x(Insert),
 
     %% Erlang timestamp
@@ -392,8 +392,8 @@ bind_timestamp_test() ->
     %% Results are returned in fp
     ?assertEqual(
        {ok, [#column{ name = <<"a">>, type = timestamp }],
-            [{{{   0, 1,  1}, { 0,  0,  0.0}}},
-             {{{1970, 8, 11}, { 8,  0,  0.0}}},
+            [{{{   0, 1,  1}, { 0,  0,  0}}},
+             {{{1970, 8, 11}, { 8,  0,  0}}},
              {{{2022, 3, 19}, {22, 36, 23.983105}}} ]},
        educkdb:squery(Conn, "select * from test order by a")),
 
@@ -754,7 +754,7 @@ appender_append_time_test() ->
     ok = educkdb:appender_flush(Appender),
 
     Expected = {ok,[#column{ name = <<"a">>, type = time}],
-                [{{0,0,0.0}},{{10,10,10.0}},{{23,50,55.123456}}]},
+                [{{0, 0, 0}},{{10, 10, 10}},{{23,50,55.123456}}]},
     ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.
@@ -803,10 +803,10 @@ appender_append_timestamp_test() ->
     ok = educkdb:appender_flush(Appender),
 
     Expected = {ok,[#column{ name = <<"a">>, type = timestamp}],
-                [{{{0,1,1},{0,0,0.0}}},
-                 {{{1901,10,10},{10,15,0.0}}},
+                [{{{0,1,1},{0,0,0}}},
+                 {{{1901,10,10},{10,15,0}}},
                  {{{2022,3,19},{22,36,23.983105}}},
-                 {{{2032,4,29},{23,59,59.0}}}]},
+                 {{{2032,4,29},{23,59,59}}}]},
     ?assertEqual(Expected, educkdb:squery(Conn, "select * from test order by a;")),
 
     ok.

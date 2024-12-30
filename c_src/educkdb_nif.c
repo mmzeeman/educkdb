@@ -481,9 +481,6 @@ educkdb_query(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_raise_exception(env, make_atom(env, "no_memory"));
     }
 
-    /* Run the query, this function is handled by a dirty scheduler. The result datastructure
-     * is passed back.
-     */
     if(duckdb_query(conn->connection, (char *) bin.data, &(result->result)) == DuckDBError) {
         return handle_query_error(env, result);
     }
@@ -504,10 +501,17 @@ make_date_tuple(ErlNifEnv *env, duckdb_date_struct date) {
 
 static ERL_NIF_TERM
 make_time_tuple(ErlNifEnv *env, duckdb_time_struct time) {
+    if(time.micros != 0.0) {
+        return enif_make_tuple3(env,
+                enif_make_int(env, time.hour),
+                enif_make_int(env, time.min),
+                enif_make_double(env, (double) time.sec + (time.micros / 1000000.0)));
+    } 
+
     return enif_make_tuple3(env,
             enif_make_int(env, time.hour),
             enif_make_int(env, time.min),
-            enif_make_double(env, (double) time.sec + (time.micros / 1000000.0)));
+            enif_make_int(env, time.sec));
 }
 
 /*
