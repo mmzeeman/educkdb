@@ -98,7 +98,10 @@
     uuid_string_to_uuid_binary/1,
 
     hugeint_to_integer/1,
-    integer_to_hugeint/1
+    integer_to_hugeint/1,
+
+    uhugeint_to_integer/1,
+    integer_to_uhugeint/1
 ]).
 
 -include("educkdb.hrl").
@@ -109,7 +112,6 @@
 -type result() :: reference().
 -type appender() :: reference().
 -type data_chunk() :: reference().
-
 
 -type sql() :: iodata(). 
 
@@ -128,8 +130,9 @@
 -type uint64() :: 0..16#FFFFFFFFFFFFFFFF.  % DuckDB ubigint
 
 -type hugeint() :: #hugeint{}. % struct, making up a 128 bit signed integer.
+-type uhugeint() :: #uhugeint{}. % struct, making up a 128 bit unsigned integer.
 
--type second() :: float(). %% In the range 0.0..60.0
+-type second() :: calendar:time() | float(). %% In the range 0.0..60.0
 -type time() :: {calendar:hour(), calendar:minute(), second()}.
 -type datetime() :: {calendar:date(), time()}.
 
@@ -146,7 +149,7 @@
 -type type_name() :: boolean
                    | tinyint | smallint | integer | bigint 
                    | utinyint | usmallint | uinteger | ubigint
-                   | float | double | hugeint
+                   | float | double | hugeint | uhugeint
                    | timestamp | date | time
                    | interval 
                    | varchar | blob
@@ -164,7 +167,7 @@
 -export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0,
               int8/0, int16/0, int32/0, int64/0,
               uint8/0, uint16/0, uint32/0, uint64/0,
-              idx/0, hugeint/0, second/0, time/0, datetime/0
+              idx/0, hugeint/0, uhugeint/0, second/0, time/0, datetime/0
              ]).
 
 -define(SEC_TO_MICS(S), (S * 1000000)).
@@ -760,7 +763,7 @@ transpose([[]|_]) -> [];
 transpose(M) ->
     [ lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
 
-%% @doc Convert a duckdb hugeint record to erlang integer. 
+%% @doc Convert a duckdb hugeint record to an erlang integer. 
 -spec hugeint_to_integer(Hugeint) -> Integer
     when Hugeint :: hugeint(),
          Integer :: integer().
@@ -775,6 +778,20 @@ hugeint_to_integer(#hugeint{upper=Upper, lower=Lower}) ->
          Hugeint :: hugeint().
 integer_to_hugeint(Int) ->
     #hugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.
+
+%% @doc Convert a duckdb uhugeint record to an erlang integer. 
+-spec uhugeint_to_integer(UHugeint) -> Integer
+    when UHugeint :: uhugeint(),
+         Integer :: integer().
+uhugeint_to_integer(#uhugeint{upper=Upper, lower=Lower}) ->
+    (Upper bsl 64) bor Lower.
+
+-spec integer_to_uhugeint(Integer) -> UHugeint
+    when Integer :: non_neg_integer(),
+         UHugeint :: uhugeint().
+integer_to_uhugeint(Int) when Int >= 0  ->
+    #uhugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.
+
 
 %% @doc Convert a binary represented UUID to a printable hex representation.
 uuid_binary_to_uuid_string(Bin) ->

@@ -87,6 +87,7 @@ static ERL_NIF_TERM atom_false;
 static ERL_NIF_TERM atom_type;
 static ERL_NIF_TERM atom_data;
 static ERL_NIF_TERM atom_hugeint;
+static ERL_NIF_TERM atom_uhugeint;
 static ERL_NIF_TERM null_term;
 
 
@@ -754,6 +755,22 @@ extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *vali
 }
 
 static ERL_NIF_TERM
+extract_data_uhugeint(ErlNifEnv *env, duckdb_uhugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
+
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_uhugeint huge = vector_data[i + offset];
+            data[i] = enif_make_tuple3(env, atom_uhugeint, enif_make_uint64(env, huge.upper), enif_make_uint64(env, huge.lower));
+        } else {
+            data[i] = null_term;
+        }
+    }
+
+    return enif_make_list_from_array(env, data, count);
+}
+
+static ERL_NIF_TERM
 extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data[count];
 
@@ -997,7 +1014,7 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
         case DUCKDB_TYPE_HUGEINT:
             return extract_data_hugeint(env, (duckdb_hugeint *) data, validity_mask, offset, count);
         case DUCKDB_TYPE_UHUGEINT:
-            return extract_data_no_extract(env, "uhugeint", offset, count);
+            return extract_data_uhugeint(env, (duckdb_uhugeint *) data, validity_mask, offset, count);
             
         // Binary like types
         case DUCKDB_TYPE_VARCHAR:
@@ -2435,6 +2452,7 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     atom_type = make_atom(env, "type");
     atom_data = make_atom(env, "data");
     atom_hugeint = make_atom(env, "hugeint");
+    atom_uhugeint = make_atom(env, "uhugeint");
 
     null_term = atom_undefined;
 

@@ -145,7 +145,7 @@ chunk_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, Res} = educkdb:query(Conn, "create table test(a integer);"),
+    {ok, _Res} = educkdb:query(Conn, "create table test(a integer);"),
 
     {ok, Res1} = educkdb:query(Conn, "insert into test values (1), (2), (3);"),
     [Chunk1] = educkdb:get_chunks(Res1),
@@ -939,7 +939,7 @@ boolean_extract_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, R1} = educkdb:query(Conn, "create table test(a boolean, b boolean);"),
+    {ok, _R1} = educkdb:query(Conn, "create table test(a boolean, b boolean);"),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (null, true), (false, null), (true, true), (false, false), (true, false);"),
     Expected2 = {ok,[{column,<<"Count">>,bigint}],[{5}]},
@@ -958,7 +958,7 @@ signed_extract_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, R1} = educkdb:query(Conn, "create table test(a smallint, b tinyint, c integer, d bigint);"),
+    {ok, _R1} = educkdb:query(Conn, "create table test(a smallint, b tinyint, c integer, d bigint);"),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (-10, -10, -10, -10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -978,7 +978,7 @@ unsigned_extract_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, R1} = educkdb:query(Conn, "create table test(a usmallint, b utinyint, c uinteger, d ubigint);"),
+    {ok, _R1} = educkdb:query(Conn, "create table test(a usmallint, b utinyint, c uinteger, d ubigint);"),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (10, 10, 10, 10), (11, 11, 11, 11), (12, 12, 12, 12);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -998,7 +998,7 @@ float_and_double_extract2_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, R1} = educkdb:query(Conn, "create table test(a float, b double);"),
+    {ok, _R1} = educkdb:query(Conn, "create table test(a float, b double);"),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values (1.0, 10.1), (2.0, 11.1), (3.0, 12.2);"),
     C2 = educkdb:fetch_chunk(R2),
@@ -1018,7 +1018,7 @@ varchar_extract_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
 
-    {ok, R1} = educkdb:query(Conn, "create table test(a varchar, b varchar);"),
+    {ok, _R1} = educkdb:query(Conn, "create table test(a varchar, b varchar);"),
 
     {ok, R2} = educkdb:query(Conn, "insert into test values ('1', '2'), ('3', '4'), ('', ''), ('012345678901', '012345678901234567890');"),
     C2 = educkdb:fetch_chunk(R2),
@@ -1074,6 +1074,32 @@ hugeint_test() ->
 
     ok.
 
+uhugeint_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+
+    {ok, _, _} = educkdb:squery(Conn, "create table test(a uhugeint);"),
+
+    A = educkdb:integer_to_uhugeint(0),
+    B = educkdb:integer_to_uhugeint(1),
+    C = educkdb:integer_to_uhugeint(1111),
+    D = educkdb:integer_to_uhugeint(170141183460469231731687303715884105727),
+
+    Expected1 = {ok,[#column{ name = <<"u">>, type = uhugeint}],
+                 [{# uhugeint{ upper = 9223372036854775807, lower = 18446744073709551615} }]},
+    ?assertMatch(Expected1, educkdb:squery(Conn, "SELECT 170141183460469231731687303715884105727::uhugeint as u")),
+
+    {ok, _, _} = educkdb:squery(Conn, "insert into test values(170141183460469231731687303715884105727::uhugeint)"),
+    {ok, _, _} = educkdb:squery(Conn, "insert into test values(1111::uhugeint)"),
+    {ok, _, _} = educkdb:squery(Conn, "insert into test values(1::uhugeint)"),
+    {ok, _, _} = educkdb:squery(Conn, "insert into test values(0::uhugeint)"),
+
+    {ok, [Type], Values} = educkdb:squery(Conn, "select * from test order by a"),
+    ?assertEqual(#column{ name = <<"a">>, type = uhugeint}, Type),
+    ?assertEqual([ {A}, {B}, {C}, {D} ], Values),
+
+    ok.
+
 uuid_test() ->
     UUID1 = <<"00112233-4455-6677-8899-aabbccddeeff">>,
     UUID2 = <<"550e8400-e29b-41d4-a716-446655440000">>,
@@ -1120,11 +1146,11 @@ blob_test() ->
 
     ok.
 
-uhugeint_test() ->
+uhugeint_simple_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
-    Expected = {ok, [#column{ name = <<"CAST(1 AS UHUGEINT)">>, type = uhugeint}], [ { {no_extract,uhugeint} } ]},
-    ?assertMatch(Expected, educkdb:squery(Conn, "SELECT 1::uhugeint;")),
+    Expected = {ok, [#column{ name = <<"u">>, type = uhugeint}], [ { #uhugeint{ upper = 0, lower = 1} } ]},
+    ?assertMatch(Expected, educkdb:squery(Conn, "SELECT 1::uhugeint as u;")),
     ok.
 
 enum_test() ->
