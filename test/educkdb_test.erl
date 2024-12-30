@@ -994,6 +994,18 @@ unsigned_extract_test() ->
 
     ok.
 
+interval_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, Type, Value} = educkdb:squery(Conn, "SELECT INTERVAL '1 month 2 day 3 hour 4 minute 5 second' AS my_interval;"),
+
+    ?assertEqual([], Value),
+    ?assertEqual([], Type),
+
+    ok.
+
+
+
 float_and_double_extract2_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),

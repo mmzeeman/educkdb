@@ -739,6 +739,40 @@ extract_data_time(ErlNifEnv *env, duckdb_time *vector_data, uint64_t *validity_m
 }
 
 static ERL_NIF_TERM
+extract_data_interval(ErlNifEnv *env, duckdb_interval *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
+
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_interval interval = vector_data[i + offset];
+
+            int32_t months = interval.months;
+            int32_t days = interval.days;
+            int64_t micros = interval.micros;
+
+            double seconds = (double) micros / 1000000.0;
+            int hours = (int) (seconds / 3600);
+            seconds -= hours * 3600;
+            int minutes = (int)(seconds / 60);
+            seconds -= minutes * 60;
+
+            data[i] = enif_make_tuple3(env,
+                    enif_make_tuple3(env,
+                        enif_make_int(env, hours),
+                        enif_make_int(env, minutes),
+                        enif_make_double(env, seconds)),
+                    enif_make_int(env, days),
+                    enif_make_int(env, months));
+        } else {
+            data[i] = null_term;
+        }
+    }
+
+    return enif_make_list_from_array(env, data, count);
+}
+
+
+static ERL_NIF_TERM
 extract_data_hugeint(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data[count];
 
@@ -1008,7 +1042,8 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
 
         // Interval
         case DUCKDB_TYPE_INTERVAL:
-            return extract_data_no_extract(env, "interval", offset, count);
+            return extract_data_interval(env, (duckdb_interval *) data, validity_mask, offset, count);
+            //return extract_data_no_extract(env, "interval", offset, count);
         
         // Large integers
         case DUCKDB_TYPE_HUGEINT:
