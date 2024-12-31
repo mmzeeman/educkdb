@@ -1016,8 +1016,6 @@ interval_test() ->
 
     ok.
 
-
-
 float_and_double_extract2_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
