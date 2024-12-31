@@ -994,6 +994,28 @@ unsigned_extract_test() ->
 
     ok.
 
+interval_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, Type, V1} = educkdb:squery(Conn, "SELECT INTERVAL '1 month 2 day 3 hour 4 minute 5 second' AS my_interval;"),
+
+    ?assertEqual([#column{ name = <<"my_interval">>, type = interval}], Type),
+    ?assertEqual([{ { {3, 4, 5}, 2, 1} }], V1),
+
+    {ok, _, V2} = educkdb:squery(Conn, "SELECT INTERVAL '13 month 14 day 15 hour 24 minute 30.5 second' AS my_interval;"),
+    ?assertEqual([{ { {15, 24, 30.5}, 14, 13}}], V2),
+
+    {ok, _, V3} = educkdb:squery(Conn, "SELECT INTERVAL '0 month 0 day 0 hour 0 minute 0 second' AS my_interval;"),
+    ?assertEqual([{ { {0, 0, 0}, 0, 0}}], V3),
+
+    {ok, _, V4} = educkdb:squery(Conn, "SELECT INTERVAL '-2 month 0 day 0 hour 0 minute 0 second' AS my_interval;"),
+    ?assertEqual([{ { {0, 0, 0}, 0, -2}}], V4),
+
+    {ok, _, V5} = educkdb:squery(Conn, "SELECT INTERVAL '-2 month -3 day -23 hour 0 minute 0 second' AS my_interval;"),
+    ?assertEqual([{ { {-23, 0, 0}, -3, -2}}], V5),
+
+    ok.
+
 float_and_double_extract2_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
