@@ -1059,7 +1059,6 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
         // Interval
         case DUCKDB_TYPE_INTERVAL:
             return extract_data_interval(env, (duckdb_interval *) data, validity_mask, offset, count);
-            //return extract_data_no_extract(env, "interval", offset, count);
         
         // Large integers
         case DUCKDB_TYPE_HUGEINT:
