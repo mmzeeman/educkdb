@@ -185,7 +185,7 @@ prepare_test() ->
 
     ok.
 
-parameter_name_test() ->
+parameter_name_and_type_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
     {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
@@ -216,7 +216,6 @@ parameter_name_test() ->
     educkdb:close(Db),
 
     ok.
-
 
 bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
