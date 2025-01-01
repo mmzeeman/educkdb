@@ -1480,6 +1480,27 @@ educkdb_parameter_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_clear_bindings(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    duckdb_state rc;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+
+    rc = duckdb_clear_bindings(stmt->statement);
+    if(rc == DuckDBError) {
+        return atom_error;
+    }
+
+    return atom_ok;
+}
+
+static ERL_NIF_TERM
 educkdb_bind_boolean(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     ErlNifUInt64 index;
@@ -2605,6 +2626,7 @@ static ErlNifFunc nif_funcs[] = {
     // Prepare
     {"parameter_name", 2, educkdb_parameter_name},
     {"parameter_type", 2, educkdb_parameter_type},
+    {"clear_bindings", 1, educkdb_clear_bindings},
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},
     {"bind_int16", 3, educkdb_bind_int16},

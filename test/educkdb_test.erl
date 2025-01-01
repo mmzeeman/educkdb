@@ -201,7 +201,6 @@ parameter_name_and_type_test() ->
     ?assertEqual(<<"min_id">>, educkdb:parameter_name(P2, 2)),
     ?assertException(error, badarg, educkdb:parameter_name(P2, 3)),
 
-
     %% Posistional parameters allow querying the type
     {ok, P3} = educkdb:prepare(Conn, "select * from test where id = ?"),
     ?assertEqual(integer, educkdb:parameter_type(P3, 1)),
@@ -214,6 +213,19 @@ parameter_name_and_type_test() ->
 
     educkdb:disconnect(Conn),
     educkdb:close(Db),
+
+    ok.
+
+clear_bindings_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+
+    {ok, P1} = educkdb:prepare(Conn, "select * from test"),
+    ok = educkdb:clear_bindings(P1),
+
+    {ok, P2} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
+    ok = educkdb:clear_bindings(P2),
 
     ok.
 

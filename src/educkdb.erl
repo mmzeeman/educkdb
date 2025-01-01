@@ -37,6 +37,7 @@
     execute_prepared/1,
     parameter_name/2,
     parameter_type/2,
+    clear_bindings/1,
     bind_boolean/3,
     bind_int8/3,
     bind_int16/3,
@@ -286,6 +287,11 @@ parameter_name(_PreparedStatement, _Index) ->
 parameter_type(_PreparedStatement, _Index) ->
     erlang:nif_error(nif_library_not_loaded).
 
+%% @doc Return the parameter type of the prepared statement at the specified index.
+-spec clear_bindings(PreparedStatement) -> ok | error 
+    when PreparedStatement :: prepared_statement().
+clear_bindings(_PreparedStatement) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Bind a boolean to the prepared statement at the specified index.
 -spec bind_boolean(PreparedStatement, Index, Boolean) -> BindResponse
