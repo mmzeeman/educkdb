@@ -35,6 +35,8 @@
 
     prepare/2,
     execute_prepared/1,
+    parameter_name/2,
+    parameter_type/2,
     bind_boolean/3,
     bind_int8/3,
     bind_int16/3,
@@ -267,6 +269,23 @@ prepare(_Conn, _Sql) ->
          Result :: {ok, result()} | {error, _}.
 execute_prepared(_PreparedStatement) ->
     erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Return the parameter name of the prepared statement at the specified index.
+-spec parameter_name(PreparedStatement, Index) -> ParameterName
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         ParameterName :: binary().
+parameter_name(_PreparedStatement, _Index) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Return the parameter type of the prepared statement at the specified index.
+-spec parameter_type(PreparedStatement, Index) -> ParameterType
+    when PreparedStatement :: prepared_statement(),
+         Index :: idx(),
+         ParameterType :: type_name().
+parameter_type(_PreparedStatement, _Index) ->
+    erlang:nif_error(nif_library_not_loaded).
+
 
 %% @doc Bind a boolean to the prepared statement at the specified index.
 -spec bind_boolean(PreparedStatement, Index, Boolean) -> BindResponse
@@ -786,8 +805,8 @@ integer_to_hugeint(Int) ->
 uhugeint_to_integer(#uhugeint{upper=Upper, lower=Lower}) ->
     (Upper bsl 64) bor Lower.
 
--spec integer_to_uhugeint(Integer) -> UHugeint
-    when Integer :: non_neg_integer(),
+-spec integer_to_uhugeint(NonNegInteger) -> UHugeint
+    when NonNegInteger :: non_neg_integer(),
          UHugeint :: uhugeint().
 integer_to_uhugeint(Int) when Int >= 0  ->
     #uhugeint{upper=(Int bsr 64), lower=(Int band 16#FFFFFFFFFFFFFFFF)}.

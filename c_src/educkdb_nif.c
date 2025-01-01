@@ -1421,6 +1421,65 @@ educkdb_execute_prepared(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 }
 
 static ERL_NIF_TERM
+educkdb_parameter_name(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+    const char* name;
+    ERL_NIF_TERM erl_name;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    name = duckdb_parameter_name(stmt->statement, index);
+    if(!name) {
+        return enif_make_badarg(env);
+    }
+
+    erl_name = make_binary(env, name, strlen(name));
+    duckdb_free((char *)name);
+
+    return erl_name;
+}
+
+static ERL_NIF_TERM
+educkdb_parameter_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+    ErlNifUInt64 index;
+    duckdb_type type;
+    const char* type_name;
+    ERL_NIF_TERM erl_type;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_uint64(env, argv[1], &index)) {
+        return enif_make_badarg(env);
+    } 
+
+    type = duckdb_param_type(stmt->statement, index);
+    if(type == DUCKDB_TYPE_INVALID) {
+        return enif_make_badarg(env);
+    }
+
+    type_name = duckdb_type_name(type);
+    return make_atom(env, type_name);
+}
+
+static ERL_NIF_TERM
 educkdb_bind_boolean(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
     ErlNifUInt64 index;
@@ -2544,6 +2603,8 @@ static ErlNifFunc nif_funcs[] = {
     {"chunk_size", 1, educkdb_chunk_get_size},
 
     // Prepare
+    {"parameter_name", 2, educkdb_parameter_name},
+    {"parameter_type", 2, educkdb_parameter_type},
     {"bind_boolean_intern", 3, educkdb_bind_boolean},
     {"bind_int8", 3, educkdb_bind_int8},
     {"bind_int16", 3, educkdb_bind_int16},

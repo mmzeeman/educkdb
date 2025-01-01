@@ -185,6 +185,39 @@ prepare_test() ->
 
     ok.
 
+parameter_name_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+
+    {ok, P1} = educkdb:prepare(Conn, "select * from test"),
+    ?assertException(error, badarg, educkdb:parameter_name(P1, 1)),
+    ?assertException(error, badarg, educkdb:parameter_type(P1, 1)),
+
+    %% Posistional parameters allow querying the name 
+    {ok, P2} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
+    ?assertException(error, badarg, educkdb:parameter_name(P2, 0)),
+    ?assertEqual(<<"id">>, educkdb:parameter_name(P2, 1)),
+    ?assertEqual(<<"min_id">>, educkdb:parameter_name(P2, 2)),
+    ?assertException(error, badarg, educkdb:parameter_name(P2, 3)),
+
+
+    %% Posistional parameters allow querying the type
+    {ok, P3} = educkdb:prepare(Conn, "select * from test where id = ?"),
+    ?assertEqual(integer, educkdb:parameter_type(P3, 1)),
+
+    %% It is not possible to get the type of a named paramter
+    ?assertException(error, badarg, educkdb:parameter_type(P2, 1)),
+
+    %% But it is possible to get the name of a positional parameter
+    ?assertEqual(<<"1">>, educkdb:parameter_name(P3, 1)),
+
+    educkdb:disconnect(Conn),
+    educkdb:close(Db),
+
+    ok.
+
+
 bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),
