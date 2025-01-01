@@ -37,6 +37,7 @@
     execute_prepared/1,
     parameter_name/2,
     parameter_type/2,
+    parameter_count/1,
     clear_bindings/1,
     bind_boolean/3,
     bind_int8/3,
@@ -285,6 +286,12 @@ parameter_name(_PreparedStatement, _Index) ->
          Index :: idx(),
          ParameterType :: type_name().
 parameter_type(_PreparedStatement, _Index) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc Return the number of parameters in a prepared statement.
+-spec parameter_count(PreparedStatement) -> non_neg_integer()
+    when PreparedStatement :: prepared_statement().
+parameter_count(_PreparedStatement) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the parameter type of the prepared statement at the specified index.

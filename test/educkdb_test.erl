@@ -25,19 +25,19 @@
 -define(DB2, "./test/dbs/temp_db2.db").
 
 
--define(INT8_MIN, -127).
+-define(INT8_MIN, -128).
 -define(INT8_MAX,  127).
 -define(UINT8_MAX, 255).
 
--define(INT16_MIN, -32767).
+-define(INT16_MIN, -32768).
 -define(INT16_MAX,  32767).
 -define(UINT16_MAX, 65535).
 
--define(INT32_MIN, -2147483647).
+-define(INT32_MIN, -2147483648).
 -define(INT32_MAX,  2147483647).
 -define(UINT32_MAX, 4294967295).
 
--define(INT64_MIN,  -9223372036854775807).
+-define(INT64_MIN,  -9223372036854775808).
 -define(INT64_MAX,   9223372036854775807).
 -define(UINT64_MAX, 18446744073709551615).
 
@@ -228,6 +228,20 @@ clear_bindings_test() ->
     ok = educkdb:clear_bindings(P2),
 
     ok.
+
+parameter_count_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+
+    {ok, P1} = educkdb:prepare(Conn, "select * from test"),
+    ?assertEqual(0, educkdb:parameter_count(P1)),
+
+    {ok, P2} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
+    ?assertEqual(2, educkdb:parameter_count(P2)),
+
+    ok.
+
 
 bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),
