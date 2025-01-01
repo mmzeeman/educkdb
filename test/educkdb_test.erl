@@ -235,13 +235,25 @@ parameter_count_test() ->
     {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
 
     {ok, P1} = educkdb:prepare(Conn, "select * from test"),
-    ?assertEqual(0, educkdb:parameter_count(P1)),
+    ?assertEqual(select, educkdb:statement_type(P1)),
+
+    {ok, P2} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
+    ?assertEqual(select, educkdb:statement_type(P2)),
+
+    ok.
+
+statement_type_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+
+    {ok, P1} = educkdb:prepare(Conn, "select * from test"),
+    ?assertEqual(select, educkdb:statement_type(P1)),
 
     {ok, P2} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
     ?assertEqual(2, educkdb:parameter_count(P2)),
 
     ok.
-
 
 bind_int_test() ->
     {ok, Db} = educkdb:open(":memory:"),

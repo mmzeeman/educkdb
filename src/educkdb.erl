@@ -34,6 +34,7 @@
     query/2,
 
     prepare/2,
+    statement_type/1,
     execute_prepared/1,
     parameter_name/2,
     parameter_type/2,
@@ -160,8 +161,17 @@
                    | decimal
                    | timestamp_s | timestamp_ms | timestamp_ns
                    | enum
+                   | interval
                    | list | struct | map
                    | uuid | json.  %% Note: decimal, timestamp_s, timestamp_ms, timestamp_ns and interval's are not supported yet.
+
+-type statement_type() :: invalid
+                        | select | insert | update | explain | delete | prepare | create
+                        | execute | alter | transaction | copy | analyze | variable_set
+                        | create_func | drop | export | pragma | vacuum | call | set | load
+                        | relation | extension | logical_plan | attach | detach | multi
+                        | unknown.
+
 
 -type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
 
@@ -169,6 +179,7 @@
 -type append_response() :: ok | {error, _}.
 
 -export_type([database/0, connection/0, prepared_statement/0, result/0, sql/0,
+              type_name/0, statement_type/0,
               int8/0, int16/0, int32/0, int64/0,
               uint8/0, uint16/0, uint32/0, uint64/0,
               idx/0, hugeint/0, uhugeint/0, second/0, time/0, datetime/0
@@ -264,6 +275,12 @@ query(_Conn, _Sql) ->
 prepare(_Conn, _Sql) ->
     erlang:nif_error(nif_library_not_loaded).
 
+%% @doc Return the statement type of a prepared statement.
+-spec statement_type(PreparedStatement) -> Result
+    when PreparedStatement :: prepared_statement(),
+         Result :: statement_type().
+statement_type(_PreparedStatement) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Execute a prepared statement. The answer is returned.
 -spec execute_prepared(PreparedStatement) -> Result

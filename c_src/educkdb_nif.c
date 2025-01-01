@@ -235,6 +235,43 @@ duckdb_type_name(duckdb_type t) {
     return "unknown";
 }
 
+static const char*
+duckdb_statement_type_name(duckdb_statement_type t) {
+    switch(t) {
+        case DUCKDB_STATEMENT_TYPE_INVALID: return "invalid";
+        case DUCKDB_STATEMENT_TYPE_SELECT: return "select";
+        case DUCKDB_STATEMENT_TYPE_INSERT: return "insert";
+        case DUCKDB_STATEMENT_TYPE_UPDATE: return "update";
+        case DUCKDB_STATEMENT_TYPE_EXPLAIN: return "explain";
+        case DUCKDB_STATEMENT_TYPE_DELETE: return "delete";
+        case DUCKDB_STATEMENT_TYPE_PREPARE: return "prepare";
+        case DUCKDB_STATEMENT_TYPE_CREATE: return "create";
+        case DUCKDB_STATEMENT_TYPE_EXECUTE: return "execute";
+        case DUCKDB_STATEMENT_TYPE_ALTER: return "alter";
+        case DUCKDB_STATEMENT_TYPE_TRANSACTION: return "transaction";
+        case DUCKDB_STATEMENT_TYPE_COPY: return "copy";
+        case DUCKDB_STATEMENT_TYPE_ANALYZE: return "analyze";
+        case DUCKDB_STATEMENT_TYPE_VARIABLE_SET: return "variable_set";
+        case DUCKDB_STATEMENT_TYPE_CREATE_FUNC: return "create_func";
+        case DUCKDB_STATEMENT_TYPE_DROP: return "drop";
+        case DUCKDB_STATEMENT_TYPE_EXPORT: return "export";
+        case DUCKDB_STATEMENT_TYPE_PRAGMA: return "pragma";
+        case DUCKDB_STATEMENT_TYPE_VACUUM: return "vacuum";
+        case DUCKDB_STATEMENT_TYPE_CALL: return "call";
+        case DUCKDB_STATEMENT_TYPE_SET: return "set";
+        case DUCKDB_STATEMENT_TYPE_LOAD: return "load";
+        case DUCKDB_STATEMENT_TYPE_RELATION: return "relation";
+        case DUCKDB_STATEMENT_TYPE_EXTENSION: return "extension";
+        case DUCKDB_STATEMENT_TYPE_LOGICAL_PLAN: return "logical_plan";
+        case DUCKDB_STATEMENT_TYPE_ATTACH: return "attach";
+        case DUCKDB_STATEMENT_TYPE_DETACH: return "detach";
+        case DUCKDB_STATEMENT_TYPE_MULTI: return "multi";
+    }
+
+    // When we are missing a DUCKDB_STATEMENT TYPE;
+    return "unknown";
+}
+
 static ERL_NIF_TERM
 handle_query_error(ErlNifEnv *env, educkdb_result *result) {
     /* Don't pass errors as a result data structure, but as an error tuple
@@ -1456,7 +1493,6 @@ educkdb_parameter_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     ErlNifUInt64 index;
     duckdb_type type;
     const char* type_name;
-    ERL_NIF_TERM erl_type;
 
     if(argc != 2) {
         return enif_make_badarg(env);
@@ -1498,6 +1534,23 @@ educkdb_clear_bindings(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     }
 
     return atom_ok;
+}
+
+static ERL_NIF_TERM
+educkdb_statement_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    educkdb_prepared_statement *stmt;
+
+    if(argc != 1) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+
+    return make_atom(env,
+            duckdb_statement_type_name(
+                duckdb_prepared_statement_type(stmt->statement)));
 }
 
 static ERL_NIF_TERM
@@ -2639,6 +2692,7 @@ static ErlNifFunc nif_funcs[] = {
     {"chunk_size", 1, educkdb_chunk_get_size},
 
     // Prepare
+    {"statement_type", 1, educkdb_statement_type},
     {"parameter_count", 1, educkdb_parameter_count},
     {"parameter_name", 2, educkdb_parameter_name},
     {"parameter_type", 2, educkdb_parameter_type},
