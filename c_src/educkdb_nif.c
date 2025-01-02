@@ -313,8 +313,9 @@ educkdb_open(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
 
     size = enif_get_string(env, argv[0], filename, MAX_PATHNAME, ERL_NIF_LATIN1);
-    if(size <= 0)
+    if(size <= 0) {
         return make_error_tuple(env, "filename");
+    }
 
     // Loop through the map with options.
     if(!enif_map_iterator_create(env, argv[1], &opts_iter, ERL_NIF_MAP_ITERATOR_FIRST)) {
@@ -1487,6 +1488,44 @@ educkdb_parameter_name(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     return erl_name;
 }
 
+static ERL_NIF_TERM
+educkdb_parameter_index(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    char name[256]; // Assuming names won't exceed 255 characters + null terminator
+    int len;
+    educkdb_prepared_statement *stmt;
+    ErlNifBinary bin;
+    idx_t index;
+    duckdb_state rc;
+
+    if(argc != 2) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_resource(env, argv[0], educkdb_prepared_statement_type, (void **) &stmt)) {
+        return enif_make_badarg(env);
+    }
+
+    if(!enif_get_atom(env, argv[1], name, sizeof(name), ERL_NIF_UTF8)) {
+        if(!enif_inspect_binary(env, argv[1], &bin)) {
+            return enif_make_badarg(env);
+        } else {
+            if(bin.size + 1 > sizeof(name)) {
+                return enif_make_badarg(env);
+            }
+
+            memcpy(name, (char *)bin.data, bin.size);
+            name[bin.size] = '\0';
+        }
+    } 
+
+    rc = duckdb_bind_parameter_index(stmt->statement, &index, name);
+    if(rc == DuckDBError) {
+        return enif_make_atom(env, "none");
+    }
+
+    return enif_make_uint64(env, index);
+}
+ 
 static ERL_NIF_TERM
 educkdb_parameter_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     educkdb_prepared_statement *stmt;
@@ -2695,6 +2734,7 @@ static ErlNifFunc nif_funcs[] = {
     {"statement_type", 1, educkdb_statement_type},
     {"parameter_count", 1, educkdb_parameter_count},
     {"parameter_name", 2, educkdb_parameter_name},
+    {"parameter_index", 2, educkdb_parameter_index},
     {"parameter_type", 2, educkdb_parameter_type},
     {"clear_bindings", 1, educkdb_clear_bindings},
     {"bind_boolean_intern", 3, educkdb_bind_boolean},

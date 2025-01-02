@@ -216,6 +216,23 @@ parameter_name_and_type_test() ->
 
     ok.
 
+parameter_index_test() ->
+    {ok, Db} = educkdb:open(":memory:"),
+    {ok, Conn} = educkdb:connect(Db),
+    {ok, _, _} = educkdb:squery(Conn, "create table test(id integer, value varchar(20));"),
+    {ok, P1} = educkdb:prepare(Conn, "select * from test where id = $id and id > $min_id"),
+
+    ?assertEqual(none, educkdb:parameter_index(P1, not_found)),
+
+    ?assertEqual(1, educkdb:parameter_index(P1, id)),
+    ?assertEqual(1, educkdb:parameter_index(P1, <<"id">>)),
+    ?assertEqual(2, educkdb:parameter_index(P1, min_id)),
+    ?assertEqual(2, educkdb:parameter_index(P1, <<"min_id">>)),
+
+    ?assertEqual(2, educkdb:parameter_index(P1, <<"min_id">>)),
+
+    ok.
+
 clear_bindings_test() ->
     {ok, Db} = educkdb:open(":memory:"),
     {ok, Conn} = educkdb:connect(Db),

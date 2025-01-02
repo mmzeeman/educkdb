@@ -39,6 +39,7 @@
     parameter_name/2,
     parameter_type/2,
     parameter_count/1,
+    parameter_index/2,
     clear_bindings/1,
     bind_boolean/3,
     bind_int8/3,
@@ -309,6 +310,12 @@ parameter_type(_PreparedStatement, _Index) ->
 -spec parameter_count(PreparedStatement) -> non_neg_integer()
     when PreparedStatement :: prepared_statement().
 parameter_count(_PreparedStatement) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec parameter_index(PreparedStatement, Name) -> non_neg_integer()
+    when PreparedStatement :: prepared_statement(),
+         Name :: atom() | binary().
+parameter_index(_PreparedStatement, _Name) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Return the parameter type of the prepared statement at the specified index.
