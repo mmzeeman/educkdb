@@ -1505,7 +1505,7 @@ educkdb_parameter_index(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_badarg(env);
     }
 
-    if(!enif_get_atom(env, argv[1], name, sizeof(name), ERL_NIF_UTF8)) {
+    if(!enif_get_atom(env, argv[1], name, sizeof(name), ERL_NIF_LATIN1)) {
         if(!enif_inspect_binary(env, argv[1], &bin)) {
             return enif_make_badarg(env);
         } else {
