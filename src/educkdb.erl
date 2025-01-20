@@ -1,10 +1,10 @@
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-%% @copyright 2022-2024 Maas-Maarten Zeeman
+%% @copyright 2022-2025 Maas-Maarten Zeeman
 %%
 %% @doc Low level erlang API for duckdb databases.
 %% @end
 
-%% Copyright 2022-2024 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
+%% Copyright 2022-2025 Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -152,6 +152,13 @@
               | #{binary() => data()}
               | {map, list(data()), list(data())}.
 
+-type column(ColumnType) :: [ColumnType].
+
+-type ok_response() :: {ok, ColumnDescription :: list(), RowValues :: list()}.
+
+-type query_error() :: any().
+-type error_response() :: {error, query_error()}.
+
 -type type_name() :: boolean
                    | tinyint | smallint | integer | bigint 
                    | utinyint | usmallint | uinteger | ubigint
@@ -172,9 +179,6 @@
                         | create_func | drop | export | pragma | vacuum | call | set | load
                         | relation | extension | logical_plan | attach | detach | multi
                         | unknown.
-
-
--type named_column() :: #{ name := binary(), data := list(data()), type := type_name() }.
 
 -type bind_response() :: ok | {error, _}.
 -type append_response() :: ok | {error, _}.
@@ -549,7 +553,9 @@ chunk_column_types(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc Get the columns data of the chunk
-%% [todo] spec
+-spec chunk_columns(DataChunk) -> ColumnData
+      when DataChunk :: data_chunk(),
+           ColumnData :: list().
 chunk_columns(_Chunk) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -789,7 +795,7 @@ chunk_rows(Chunk, Result, Rows) ->
 -spec squery(Connection, Sql) -> Result
     when Connection :: connection(),
          Sql :: sql(),
-         Result :: {ok, [ named_column() ]} | {error, _}.
+         Result :: {ok, list(), list()} | {error, _}.
 squery(Connection, Sql) ->
     case query(Connection, Sql) of
         {ok, Result} ->
@@ -802,7 +808,7 @@ squery(Connection, Sql) ->
 %%      data chunk.
 -spec execute(PreparedStatement) -> Result
     when PreparedStatement :: prepared_statement(),
-         Result :: {ok, [ named_column() ]} | {error, _}.
+         Result :: {ok, list(), list()} | {error, _}.
 execute(Stmt) ->
     case execute_prepared(Stmt) of
         {ok, Result} ->
@@ -815,9 +821,13 @@ execute(Stmt) ->
 %% Utilities
 %% 
 
-transpose([[]|_]) -> [];
-transpose(M) ->
-    [ lists:map(fun hd/1, M) | transpose(lists:map(fun tl/1, M))].
+transpose(ColumnTuple) ->
+    %% [TODO] nif versie van maken?
+    transpose1(erlang:tuple_to_list(ColumnTuple)).
+
+transpose1([[]|_]) -> [];
+transpose1(M) ->
+    [ lists:map(fun hd/1, M) | transpose1(lists:map(fun tl/1, M))].
 
 %% @doc Convert a duckdb hugeint record to an erlang integer. 
 -spec hugeint_to_integer(Hugeint) -> Integer

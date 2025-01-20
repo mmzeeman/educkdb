@@ -153,7 +153,7 @@ chunk_test() ->
     ?assertEqual(1, educkdb:chunk_column_count(Chunk1)),
     ?assertEqual(1, educkdb:chunk_size(Chunk1)),
     ?assertEqual([bigint], educkdb:chunk_column_types(Chunk1)),
-    ?assertEqual([[3]], educkdb:chunk_columns(Chunk1)),
+    ?assertEqual({[3]}, educkdb:chunk_columns(Chunk1)),
 
 
     {ok, Res2} = educkdb:query(Conn, "select * from test;"),
@@ -162,7 +162,7 @@ chunk_test() ->
     ?assertEqual(1, educkdb:chunk_column_count(Chunk2)),
     ?assertEqual(3, educkdb:chunk_size(Chunk2)),
     ?assertEqual([integer], educkdb:chunk_column_types(Chunk2)),
-    ?assertEqual([[1,2,3]], educkdb:chunk_columns(Chunk2)),
+    ?assertEqual({[1,2,3]}, educkdb:chunk_columns(Chunk2)),
 
     ok.
 
@@ -926,7 +926,10 @@ yielding_test() ->
     ?assertEqual(Expected, educkdb:squery(Conn, "select count(*) as count from test;")),
 
     {ok, Res} = educkdb:query(Conn, "select a from test order by a;"),
-    Chunks = [ educkdb:chunk_columns(C) || C <- educkdb:get_chunks(Res) ],
+    Chunks = [ begin 
+                   { A } = educkdb:chunk_columns(C),
+                   A
+               end || C <- educkdb:get_chunks(Res) ],
     Col = lists:flatten(Chunks),
     ?assertEqual(length(Values), length(Col)),
     Values = Col,
@@ -1008,7 +1011,7 @@ fetch_chunk_test() ->
     C2 = educkdb:fetch_chunk(R2),
 
     ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
-    ?assertEqual( [ [3] ], educkdb:chunk_columns(C2)),
+    ?assertEqual( { [3] }, educkdb:chunk_columns(C2)),
 
     '$end' = educkdb:fetch_chunk(R2),
 
@@ -1016,7 +1019,7 @@ fetch_chunk_test() ->
     C3 = educkdb:fetch_chunk(R3),
 
     ?assertEqual( [ integer ], educkdb:chunk_column_types(C3)),
-    ?assertEqual( [ [10, 11, 12] ], educkdb:chunk_columns(C3)),
+    ?assertEqual( { [10, 11, 12] }, educkdb:chunk_columns(C3)),
 
     '$end' = educkdb:fetch_chunk(R3),
 
@@ -1051,13 +1054,13 @@ signed_extract_test() ->
     C2 = educkdb:fetch_chunk(R2),
 
     [ bigint ] = educkdb:chunk_column_types(C2),
-    [[3]] = educkdb:chunk_columns(C2),
+    {[3]} = educkdb:chunk_columns(C2),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:fetch_chunk(R3),
 
     ?assertEqual([smallint, tinyint, integer, bigint], educkdb:chunk_column_types(C3)),
-    ?assertEqual([[-10,11,12], [-10,11,12], [-10,11,12], [-10,11,12]], educkdb:chunk_columns(C3)),
+    ?assertEqual({[-10,11,12], [-10,11,12], [-10,11,12], [-10,11,12]}, educkdb:chunk_columns(C3)),
 
     ok.
 
@@ -1071,13 +1074,13 @@ unsigned_extract_test() ->
     C2 = educkdb:fetch_chunk(R2),
 
     ?assertEqual([bigint], educkdb:chunk_column_types(C2)),
-    ?assertEqual([[3]], educkdb:chunk_columns(C2)),
+    ?assertEqual({[3]}, educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:fetch_chunk(R3),
 
     ?assertEqual([usmallint, utinyint, uinteger, ubigint], educkdb:chunk_column_types(C3)),
-    ?assertEqual([[10,11,12], [10,11,12], [10,11,12], [10,11,12]], educkdb:chunk_columns(C3)),
+    ?assertEqual({[10,11,12], [10,11,12], [10,11,12], [10,11,12]}, educkdb:chunk_columns(C3)),
 
     ok.
 
@@ -1113,13 +1116,13 @@ float_and_double_extract2_test() ->
     C2 = educkdb:fetch_chunk(R2),
 
     ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
-    ?assertEqual( [ [3] ], educkdb:chunk_columns(C2)),
+    ?assertEqual( { [3] }, educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:fetch_chunk(R3),
 
     ?assertEqual([ float, double ], educkdb:chunk_column_types(C3)),
-    ?assertEqual([[1.0, 2.0, 3.0], [10.1, 11.1, 12.2]], educkdb:chunk_columns(C3)),
+    ?assertEqual({[1.0, 2.0, 3.0], [10.1, 11.1, 12.2]}, educkdb:chunk_columns(C3)),
 
     ok.
 
@@ -1133,13 +1136,14 @@ varchar_extract_test() ->
     C2 = educkdb:fetch_chunk(R2),
 
     ?assertEqual( [ bigint ], educkdb:chunk_column_types(C2)),
-    ?assertEqual( [ [4] ], educkdb:chunk_columns(C2)),
+    ?assertEqual( { [4] }, educkdb:chunk_columns(C2)),
 
     {ok, R3} = educkdb:query(Conn, "select * from test order by a;"),
     C3 = educkdb:fetch_chunk(R3),
 
     ?assertEqual( [ varchar, varchar ], educkdb:chunk_column_types(C3)),
-    ?assertEqual( [ [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ], [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] ], educkdb:chunk_columns(C3)),
+    ?assertEqual( { [<<"">>, <<"012345678901">>, <<"1">>, <<"3">> ],
+                    [<<"">>, <<"012345678901234567890">>, <<"2">>, <<"4">> ] }, educkdb:chunk_columns(C3)),
 
     ok.
 

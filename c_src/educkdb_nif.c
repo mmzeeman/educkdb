@@ -1195,7 +1195,7 @@ extract_chunk_columns(ErlNifEnv *env, duckdb_data_chunk chunk, idx_t column_coun
         column[i] = extract_data(env, logical_type, vector, 0, tuple_count);
     }
 
-    return enif_make_list_from_array(env, column, column_count); 
+    return enif_make_tuple_from_array(env, column, column_count); 
 }
 
 
