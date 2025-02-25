@@ -4,7 +4,7 @@
   {vsn, "0.9.9"},
   {modules, [educkdb]},
   {registered, []},
-  {licenses, ["Apache"]},
+  {licenses, ["Apache-2.0"]},
   {links, [{"Github", "https://github.com/mmzeeman/educkdb"}]},
   {include_files, ["Makefile"]},
   {applications, [
