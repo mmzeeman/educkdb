@@ -79,9 +79,13 @@ CXXFlags =
         ]}
     ]},
 
-    {edoc_opts, [{preprocess, true},
-                 {stylesheet, "style.css"},
-                 {sort_functions, false}]},
+    {project_plugins, [rebar3_ex_doc]},
 
-    {hex, [{doc, edoc}]}
+    {ex_doc, [
+        {source_url, <<"https://github.com/mmzeeman/educkdb">>},
+        {extras, [<<"README.md">>, <<"LICENSE">>]},
+        {main, <<"readme">>}
+    ]},
+
+    {hex, [{doc, ex_doc}]}
 ].
