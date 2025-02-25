@@ -2,11 +2,7 @@
 
 [![Hex.pm version](https://img.shields.io/hexpm/v/educkdb.svg)](https://hex.pm/packages/educkdb)
 [![Hex.pm downloads](https://img.shields.io/hexpm/dt/educkdb.svg)](https://hex.pm/packages/educkdb)
-
-```
-Build disabled, github's vms are too small to build duckdb amalgation build
 [![Test](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml/badge.svg)](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml)
-```
 
 DuckDB NIF for Erlang. 
 
