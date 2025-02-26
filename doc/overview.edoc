@@ -1,4 +1,0 @@
-@author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
-@title EDuckDB
-@doc <a href="https://duckdb.org">DuckDB</a> library for <a href="http://erlang.org/">Erlang</a>.
-@copyright Apache-2.0
