@@ -35,7 +35,7 @@ else ifeq ($(UNAME_SYS), FreeBSD)
 	CXXFLAGS ?= -O$(O_LEVEL) -finline-functions -Wall
 else ifeq ($(UNAME_SYS), Linux)
 	CC ?= gcc
-	CFLAGS ?= -O$(O_LEVEL)3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CFLAGS ?= -O$(O_LEVEL) -std=c99 -finline-functions -Wall -Wmissing-prototypes
 	CXXFLAGS ?= -O$(O_LEVEL) -finline-functions -Wall
 endif
 
