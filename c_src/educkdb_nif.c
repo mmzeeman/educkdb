@@ -1491,7 +1491,6 @@ educkdb_parameter_name(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 static ERL_NIF_TERM
 educkdb_parameter_index(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
     char name[MAX_ATOM_LENGTH];
-    int len;
     educkdb_prepared_statement *stmt;
     ErlNifBinary bin;
     idx_t index;
