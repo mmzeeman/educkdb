@@ -195,7 +195,7 @@
 -on_load(init/0).
 
 init() ->
-    NifName = "educkdb_nif",
+    NifName = "educkdb",
     NifFileName = case code:priv_dir(educkdb) of
                       {error, bad_name} -> filename:join("priv", NifName);
                       Dir -> filename:join(Dir, NifName)
