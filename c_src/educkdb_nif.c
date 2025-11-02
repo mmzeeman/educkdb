@@ -229,6 +229,8 @@ duckdb_type_name(duckdb_type t) {
         case DUCKDB_TYPE_TIMESTAMP_TZ: return "timestamp_tz";
         case DUCKDB_TYPE_VARINT:       return "varint";
         case DUCKDB_TYPE_SQLNULL:      return "sqlnull";
+        case DUCKDB_TYPE_STRING_LITERAL:      return "string_literal";
+        case DUCKDB_TYPE_INTEGER_LITERAL:      return "integer_literal";
     }
 
     // When we are missing a DUCKDB_TYPE;
@@ -682,6 +684,21 @@ extract_data_integer(ErlNifEnv *env, int32_t *vector_data, uint64_t *validity_ma
 }
 
 static ERL_NIF_TERM
+extract_data_integer_literal(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
+
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            data[i] = enif_make_int64(env, vector_data[i + offset]);
+        } else {
+            data[i] = null_term;
+        }
+    }
+
+    return enif_make_list_from_array(env, data, count);
+}
+
+static ERL_NIF_TERM
 extract_data_bigint(ErlNifEnv *env, int64_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data[count];
 
@@ -899,6 +916,22 @@ extract_data_uuid(ErlNifEnv *env, duckdb_hugeint *vector_data, uint64_t *validit
 
 static ERL_NIF_TERM
 extract_data_varchar(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
+    ERL_NIF_TERM data[count];
+
+    for(idx_t i=0; i < count; i++) {
+        if(duckdb_validity_row_is_valid(validity_mask, i + offset)) {
+            duckdb_string_t value = vector_data[i + offset];
+            data[i] = make_binary(env, duckdb_string_t_data(&value), duckdb_string_t_length(value));
+        } else {
+            data[i] = null_term;
+        }
+    }
+
+    return enif_make_list_from_array(env, data, count);
+}
+
+static ERL_NIF_TERM
+extract_data_string_literal(ErlNifEnv *env, duckdb_string_t *vector_data, uint64_t *validity_mask, uint64_t offset, uint64_t count) {
     ERL_NIF_TERM data[count];
 
     for(idx_t i=0; i < count; i++) {
@@ -1152,6 +1185,12 @@ internal_extract_data(ErlNifEnv *env, duckdb_vector vector, duckdb_logical_type 
 
         case DUCKDB_TYPE_VARINT:
             return extract_data_no_extract(env, "varint", offset, count);
+
+        case DUCKDB_TYPE_STRING_LITERAL:
+            return extract_data_string_literal(env, (duckdb_string_t *) data, validity_mask, offset, count);
+
+        case DUCKDB_TYPE_INTEGER_LITERAL:
+            return extract_data_integer_literal(env, (int64_t *) data, validity_mask, offset, count);
 
         default:
             return extract_data_no_extract(env, "default", offset, count);
