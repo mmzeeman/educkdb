@@ -4,10 +4,14 @@
 [![Hex.pm downloads](https://img.shields.io/hexpm/dt/educkdb.svg)](https://hex.pm/packages/educkdb)
 [![Test](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml/badge.svg)](https://github.com/mmzeeman/educkdb/actions/workflows/test.yml)
 
+
 DuckDB NIF for Erlang. 
 
 DuckDB (https://duckdb.org/) is an in-process SQL OLAP database management system. This library makes it possible to 
 use DuckDB in Erlang, Elixir or other languages supported by the beam.
+
+> **Archived:** This project is no longer maintained. I no longer use it and cannot justify maintaining it as a free project. The repository will remain available for reference, but I do not plan to review issues, pull requests, or publish new releases. Thank you to everyone who used and contributed to the project.
+
 
 # Example
 
